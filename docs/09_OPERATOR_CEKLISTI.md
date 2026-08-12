@@ -1,5 +1,12 @@
 # 09 — Operatör Günlük Checklist'i
 
+> **Önce şunu oku:** Eğer projeyi ilk kez kullanıyorsan veya akışı
+> bilmiyorsan, **`rehber.bat`** dosyasını çalıştır (Windows'ta çift tıkla).
+> Bu belge rehber.bat'ın arka planındaki detayları içerir — rehber.bat
+> seni adım adım yönlendirirken, bu belge "neden öyle?" sorusunun
+> cevabını verir. Akış oturduktan sonra bu belgeye bakmaya gerek
+> kalmayabilir.
+
 Bu belge, sistemin ürettiği çıktıyı (15 oyuncu + kaptan/yedek kaptan +
 9 maç tahmini) gerçek TFF Fantezi Lig uygulamasına/sitesine **elle**
 nasıl gireceğini adım adım anlatır. Sistem otomatik olarak TFF'ye

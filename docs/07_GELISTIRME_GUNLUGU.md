@@ -259,6 +259,79 @@ araç adı geçmeyecek şekilde), sonra push.
 
 ---
 
+## 13 Ağustos 2026 — Rehber modu (`rehber.bat`) eklendi
+
+**Yapıldı:**
+- `rehber.bat` yazıldı — `menu.bat`'ın yanına, başlangıç seviyesi
+  kullanıcılar için adım adım sihirbaz menüsü. 6 ana menü + 6 alt-adım
+  (2a-2f) haftalık hazırlık akışı.
+- Her alt-adımda: ne yapacağını Türkçe açıklar, ilgili prompt dosyasını
+  Notepad ile açar, dosya kaydedildi mi kontrol eder, sıradaki adıma
+  yönlendirir.
+- `[5] SİSTEM DURUMU` menüsü — "nerede kaldım?" sorusuna JSON dosyalarının
+  varlığından cevap çıkarır, sıradaki adımı söyler. State dosyası tutmaz,
+  her girişte dosyalardan durumu çıkarır.
+- `[2c]` Nostradamus adımında, fixtures JSON dosyası yoksa otomatik
+  şablon oluşturur (1 maçlı örnek), kullanıcı Notepad ile 9 maça tamamlar.
+- `docs/05` güncellendi — iki batch dosyasının karşılaştırması eklendi,
+  "hangisini kullanmalısın?" rehberi.
+- `docs/09` başına yönlendirme notu eklendi — "ilk kez kullanıyorsan
+  rehber.bat'ı çalıştır, bu belge arka plan detayı için".
+- Tüm `notepad` çağrıları `start notepad`'a çevrildi (rehber.bat
+  beklemesin, kullanıcı kendi tempo'sunda devam etsin).
+- `if %GWeek% LSS 17` → `if !GWeek! LSS 17` (delayed expansion, sayı
+  karşılaştırması güvenli).
+
+**Araştırıldı (kaynak + sonuç):**
+- Batch dosyasında `notepad "file"` çağrısı kullanıcının Notepad'i
+  kapatmasını bekler (bloklar). `start notepad "file"` ise bloklamaz —
+  kullanıcı kendi tempo'sunda okur, kaydeder, rehber.bat'a geri döner.
+  Bu, "saat dilimi yok, ne zaman müsaitse" felsefesine uygun.
+- `setlocal enabledelayedexpansion` zaten `menu.bat`'ta vardı, `rehber.bat`'a
+  da eklendi. `if` bloğu içinde `set` ile değişen değişkenleri `!var!` ile
+  okumak için zorunlu.
+- `chcp 65001` (UTF-8 kod sayfası) batch dosyasında Türkçe karakterlerin
+  konsolda düzgün görünmesi için gerekli — `menu.bat`'taki desen korundu.
+- Linux'ta batch simülasyonu: `cmd.exe` olmadığı için Python ile mantık
+  test edildi. 16 etiket, 16 goto/call — hepsi eşleşiyor. 3 örnek JSON
+  ile full [2] akışı test edildi, tüm Python script'leri çağrı biçiminde
+  sorunsuz çalışıyor.
+
+**Kararlaştırıldı (ve neden):**
+- `rehber.bat` `menu.bat`'ın **yerine** değil, **yanına** eklendi.
+  İleride kullanıcı akış oturunca `menu.bat`'a geçebilir — ikisi de
+  aynı Python script'lerini çağırır, sadece UX farkı var.
+- Saat dilimi yok ("T-48 saat" gibi). Kullanıcı perşembe akşamı da
+  girebilir, pazar sabahı da. Sistem sadece "bu adımı yaptın mı?"
+  diye kontrol eder, saatlere karışmaz — kullanıcının "otonom
+  ilerliyor" hissini korumak için.
+- Her alt-adımda "yaptım, devam" / "şimdi yapamam, atla" / "geri dön"
+  seçeneği var. Kullanıcı bir adımı atlayıp sonrasına geçebilir,
+  eksik adımı sonra tamamlayabilir. State dosyası tutulmaz — her
+  girişte dosya varlığından durum çıkarılır (basit, güvenli).
+- "Çocuğa anlatır gibi" dil — her adımda "ADIM 1: ... ADIM 2: ..."
+  şeklinde numaralandırılmış, kısa cümleler. Jargon minimum.
+- Notepad kullanımı (VS Code gibi gelişmiş editör yerine) — her
+  Windows'ta varsayılan olarak var, ekstra kurulum gerektirmez.
+
+**Test sonuçları:**
+- `rehber_test.py` (Linux'ta statik analiz) — 16 etiket, 16 goto/call,
+  hepsi eşleşiyor. 7 Python script'inin --help çıktısı OK. Nostradamus
+  şablonu geçerli JSON.
+- Full [2] akışı simülasyonu (3 örnek JSON ile) — `update_from_web_research.py`
+  dry-run OK (1 sakatlık, isim eşleşmedi — beklenen), `ingest_price_updates.py`
+  dry-run OK (1 fiyat eşleşti), `nostradamus_predict.py` OK (2 maç tahmini
+  üretildi), `run_gameweek.py` OK (kadro üretildi, gw1_kadro_onerisi.xlsx
+  oluştu). 0 hata.
+- Windows'ta gerçek test yapılmadı (Linux ortamı) — kullanıcı Windows'ta
+  çift tıklayıp deneyebilir. Hata olursa `docs/07`'ye not düşülmeli.
+
+**Sıradaki adım:** Kullanıcı Windows'ta `rehber.bat`'ı test edecek.
+İlk hafta deneyimine göre UX iyileştirmeleri yapılabilir (örn. daha
+kısa promptlar, ekran temizleme, renkli çıktı).
+
+---
+
 ## [SONRAKİ OTURUM İÇİN ŞABLON — kopyala, doldur]
 ## <Tarih> — <kısa başlık>
 **Yapıldı:**

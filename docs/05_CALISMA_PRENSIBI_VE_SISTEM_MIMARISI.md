@@ -19,28 +19,42 @@ Bu desen zaten `update_from_web_research.py`, `ingest_gameweek_results.py`,
 yazarsan (ör. transfer penceresi için) AYNI DESENİ kopyala.
 
 ## `.bat` Menü Sistemi (Windows, operatör için)
-`menu.bat` dosyası repo kökünde yazıldı. Tüm ingest script'lerini
-dry-run önce, onay sonrası `--apply` deseninde çağırır. Operatör
-sadece hafta numarasını ve JSON dosya yollarını girer.
 
-Menü seçenekleri:
-- **[0]** Hafta numarası ayarla (tüm script'lerde `%GWeek%` olarak kullanılır)
-- **[1]** Excel dosyası seç (varsayılan: `oyuncu_veritabani.xlsx`)
-- **[2]** Kadro optimizasyonu → `python run_gameweek.py <excel> --gameweek <N>`
-- **[3]** Nostradamus tahminleri → `python nostradamus_predict.py <fixtures.json>`
-  (operator önce 9 maçın oranlarını JSON'a manuel girer, bkz. `docs/09`)
-- **[4]** Web AI çıktıları alt-menüsü:
-  - `[4a]` Sakatlık/ceza → `update_from_web_research.py`
-  - `[4b]` Fiyat → `ingest_price_updates.py`
-  - `[4c]` Maç sonuçları → `ingest_gameweek_results.py`
-  - `[4d]` Transfer penceresi → `ingest_transfer_window.py`
-  Her biri önce dry-run, sonra "Uygulansın mı? (e/h)" onayı.
-- **[5]** Transfer penceresi (aynı [4d], kısayol)
-- **[6]** Backtest alt-menüsü (Nostradamus baseline kontrolü):
-  - `[6a]` Devig-only baseline Brier score
-  - `[6b]` Poisson+Elo karşılaştırma (docs/03 kuralı gereği EKLENMEZ,
-    ama tekrar değerlendirme için tutulur)
-- **[7]** Çıkış
+Repo kökünde **iki** batch dosyası var. İhtiyacına göre birini seç:
+
+### `rehber.bat` — Başlangıç seviyesi (önerilen)
+"sihirbaz" gibi — seni adım adım elinden tutar. Hangi sırada ne
+yapacağını bilmiyorsan bunu kullan. Saat dilimi yok, "ne zaman
+müsaitse gir" felsefesi.
+
+6 ana menü:
+- **[1] İLK KEZ BAŞLIYORUM** — sezon başı tek seferlik kurulum
+  (Python/Excel/prompt dosyalarını kontrol eder, hafta numarasını sorar)
+- **[2] YENİ HAFTA HAZIRLIĞI** — deadline'dan önce yapılacaklar
+  6 alt-adım: a) sakatlık topla → b) fiyat topla → c) oran topla →
+  d) sisteme yükle → e) kadro üret → f) TFF'ye elle gir
+  Her alt-adımda: ne yapacağını söyler, ilgili prompt dosyasını
+  Notepad ile açar, dosyayı kaydedip kaydetmediğini kontrol eder.
+  İstediğin adımda çıkıp sonra devam edebilirsin.
+- **[3] MAÇLAR BİTTİ** — maç sonrası gerçek sonuçları gir
+  (calibrate_priors.py için gerekli)
+- **[4] TRANSFER PENCERESİ** — sadece 17. hafta sonrası
+- **[5] SİSTEM DURUMU** — "nerede kaldım?" sorusuna cevap verir,
+  hangi JSON dosyalarının hazır olduğunu gösterir, sıradaki adımı söyler
+- **[6] BACKTEST** — aylık sağlık kontrolü (Brier score)
+
+### `menu.bat` — İleri kullanıcılar
+"Araç kutusu" gibi — her script'i ayrı seçenek olarak çağırır.
+Hangi sırada kullanacağını biliyorsan bunu kullan. `rehber.bat`'ın
+yaptığı yönlendirmeyi içermez, sadece Python script'lerini çalıştırır.
+
+7 ana menü + 2 alt-menü (Web AI çıktıları + Backtest). Her ingest
+script'i dry-run önce, "Uygulansın mı? (e/h)" onayı sonrası --apply.
+
+### Hangisini kullanmalısın?
+- **İlk hafta veya emin değilsen**: `rehber.bat`
+- **Birkaç hafta sonra akış oturduğunda**: `menu.bat` (daha hızlı)
+- İkisi de aynı Python script'lerini çağırır, sadece UX farkı var
 
 İskeletin eski halindeki placeholder'lar (`nostradamus_predict.py` ve
 `ingest_transfer_window.py`) artık gerçek dosya adlarıdır — her ikisi de
