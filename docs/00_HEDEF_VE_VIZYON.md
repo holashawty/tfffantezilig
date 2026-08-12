@@ -33,12 +33,13 @@ sen (agent) değil, önceki analiz sürecinde biz vardık. Uygula:
 
 ## Başarı kriteri ("final" ne zaman gelir)
 Bu bir deney, "bitmez" ama şu kilometre taşları final sayılır:
-1. Kadro motoru: her hafta hatasız, kısıt-ihlalsiz kadro üretiyor (ŞU AN TAMAMLANDI)
+1. Kadro motoru: her hafta hatasız, kısıt-ihlalsiz kadro üretiyor (TAMAMLANDI)
 2. Nostradamus motoru: geçmiş sezon backtest'inde devig-only baseline'ı
-   ölçülmüş ve kayıt altına alınmış (BEKLENIYOR)
-3. Transfer penceresi mekanizması kurulu (BEKLENİYOR)
+   ölçülmüş ve kayıt altına alınmış (TAMAMLANDI — Brier 0.5557, docs/07)
+3. Transfer penceresi mekanizması kurulu (TAMAMLANDI — `ingest_transfer_window.py`,
+   `is_active` kolonu, docs/06)
 4. Sezon sonunda: gerçek performans (Brier score, kadro puanı sıralaması)
-   `07_GELISTIRME_GUNLUGU.md`'ye işlenmiş
+   `07_GELISTIRME_GUNLUGU.md`'ye işlenmiş (BEKLENİYOR — sezon başlamadı)
 
 ## Diğer dosyalar
 - `01_OYUN_KURALLARI_VE_ELO.md` — resmi kurallar, puanlama, ELO kaynağı
@@ -49,3 +50,4 @@ Bu bir deney, "bitmez" ama şu kilometre taşları final sayılır:
 - `06_TRANSFER_PENCERESI.md` — sezon ortası kadro değişiklikleri
 - `07_GELISTIRME_GUNLUGU.md` — her adımda güncellenecek gelişim günlüğü
 - `08_LLM_ROLU_VE_SINIRLAR.md` — yukarıdaki ilkenin uygulama detayı
+- `09_OPERATOR_CEKLISTI.md` — sistem çıktısını TFF'ye elle uygulama rehberi

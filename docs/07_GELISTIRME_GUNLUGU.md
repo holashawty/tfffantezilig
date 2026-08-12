@@ -40,6 +40,225 @@ kodlanması (Adım 0: mevcut bahis-app veritabanının denetimi ile başla).
 
 ---
 
+## 12 Ağustos 2026 (oturum 2) — Nostradamus Adım 0+2: veri entegrasyonu + devig baseline
+
+**Yapıldı:**
+- `unified.db` (94.68 MB) içinden SADECE `league_id=17` (Süper Lig) satırları
+  yeni `nostradamus/superlig_odds.db` (4.38 MB) dosyasına aktarıldı.
+  Aktarım script'i: `nostradamus/build_superlig_db.py` (idempotent).
+  Şema: matches(2782), odds(60849), teams(33), team_aliases(33),
+  xg_stats(0 — kaynakta da boş), meta(8).
+- Bilerek ALINMAYAN tablolar: `copula_models`, `transfer_models`,
+  `player_injuries`, `sharp_money_signals` (hepsi kaynakta boş, hiç
+  üretime alınmamış deneyler) + `OuziBet/core/` ML pipeline'ı
+  (~18.000 satır torch/GNN/Transformer/RL — docs/00, docs/08 ilkesine aykırı).
+- `docs/03`'e "Adım 0 ÇIKTISI — Veri Denetim Raporu" bölümü eklendi:
+  sezon kronolojisi (etiketler takvim sırasını yansıtmıyor — T1(10)=2018-19,
+  T1(11)=2025-26), veri kalitesi (gol NULL %0, kapanış 1X2 %99), market
+  dağılımı tablosu.
+- Devig-only baseline backtest yazıldı: `nostradamus/backtest_devig_baseline.py`.
+  Shin's method (`shin` paketi — kafadan formül YAZILMADI), çoklu bahisçi
+  medyanı (B365+PS), 3-sınıf Brier score.
+
+**Araştırıldı (kaynak + sonuç):**
+- Shin paketinin API'si: `calculate_implied_probabilities([o1, o2, o3])`
+  → [p1, p2, p3]. Eski `shin_method` adı yok, silinmiş.
+- Sezon etiketleri kronolojik DEĞİL: kaynak DB `T1 (1)`...`T1 (11)`
+  etiketlerini rastgele dağıtmış. Backtest script'leri `match_date`
+  yılına göre sıralamalı (denetim raporunda UYARI olarak not edildi).
+- xg_stats tablosu kaynakta Süper Lig için tamamen boş — Poisson
+  katmanı için FBref'den ayrıca toplanması gerek (Adım 3'te değerlendirilecek).
+
+**Kararlaştırıldı (ve neden):**
+- Devig baseline Brier = **0.5557** (1028 maç, 3 sezon: 2023-24, 2024-25, 2025-26).
+  - Per-sezon: 2023-24 → 0.5555, 2024-25 → 0.5365, 2025-26 → 0.5774
+  - İsabet: %57.2 (argmax tahmini doğru)
+  - Uniform rastgele baseline (0.6667)'ye göre %16.7 iyileşme
+  - 0 fallback (Shin her maçta başarılı — oransal yöntem devreye girmedi)
+- Bu sabit baseline olarak KABUL EDİLDİ — sonraki katmanlar (Poisson/Elo)
+  buna kıyasla değerlendirilecek, iyileşme yoksa eklenmeyecek (docs/03 kuralı).
+- "Piyasa" bahisçisi sadece OU_2.5 market'ine sahip, 1X2 yok — devig
+  baseline'ına katkısı yok, B365+PS medyanı kullanıldı.
+
+**Sıradaki adım:** Poisson (Dixon-Coles via `penaltyblog`) + Elo (ClubElo via
+`soccerdata`) katmanlarını dene — Brier 0.5557'nin altına düşmezse EKLEME
+(docs/03 kuralı). Sonra `06_TRANSFER_PENCERESI.md` kodlanacak.
+
+---
+
+## 12 Ağustos 2026 (oturum 2, devam) — Nostradamus Adım 3: Poisson/Elo katman denemesi → EKLENMİYOR
+
+**Yapıldı:**
+- `penaltyblog` (DixonColesGoalModel) ve `soccerdata` (ClubElo) paketleri kuruldu.
+- ClubElo cacheFetcher (`fetch_clubelo_cache.py`) ile 26/33 takımın ClubElo
+  derece geçmişi `cache/clubelo_history.csv`'ye indirildi (39.448 satır).
+- 7 takım ClubElo'da yok (Akhisar, Ankaragucu, Basaksehir/Buyuksehyr,
+  Erzurum BB, Goztep, Karagumruk, Yeni Malatyaspor) — bunlardan 4'ü
+  (Basaksehir, Ankaragucu, Goztep, Karagumruk) backtest penceresinde.
+  Backtest maçlarının %73.3'ünde (754/1028) her iki takımın ClubElo verisi var.
+- Dixon-Coles modeli her sezon başında, o sezonun ilk maç tarihinden ÖNCE
+  oynanmış tüm maçlarla fit edildi (look-ahead bias yok).
+- 10 varyant test edildi (`backtest_poisson_elo.py`):
+  - B (devig+Elo, ağırlık 0.3/0.5/0.7)
+  - C (devig+Poisson, ağırlık 0.3/0.5/0.7)
+  - D (devig+Elo+Poisson, çeşitli kombinasyonlar)
+
+**Araştırıldı (kaynak + sonuç):**
+- ClubElo'nun takım adı eşleştirmesi: 7 takım için API yanlış isimle çağrılınca
+  38 byte'lık boş CSV döndürüyor (sadece header). Doğru isimler deneme-yanılma
+  ile bulundu (ör. "Ad. Demirspor" → "Adana Demirspor", "Kayserispor" → "Kayseri",
+  "Rizespor" → "Rizespor", "Bodrumspor" → "Bodrum"). 4 takım hâlâ ClubElo'da yok.
+- penaltyblog'un `DixonColesGoalModel.predict()` metodu `FootballProbabilityGrid`
+  döndürüyor — `pred.home_draw_away` ile [p_H, p_D, p_A] listesi alınabiliyor.
+- penaltyblog'un `Elo.calculate_match_probabilities()` metodu dict
+  `{'home_win': ..., 'draw': ..., 'away_win': ...}` döndürüyor — ama biz
+  ClubElo'yu tercih ettik (docs/01'in önerdiği kaynak).
+
+**Kararlaştırıldı (ve neden):**
+- **EKLENMİYOR.** Hiçbir varyant baseline'ı (Brier 0.5557) geçemedi:
+  | Varyant | Brier | Δ Baseline | Karar |
+  |---|---:|---:|---|
+  | A) devig-only (baseline) | 0.5557 | — | sabit baseline |
+  | B) devig+Elo @0.3 | 0.5667 | +0.0110 | EKLEME |
+  | B) devig+Elo @0.5 | 0.5803 | +0.0246 | EKLEME |
+  | B) devig+Elo @0.7 | 0.5989 | +0.0432 | EKLEME |
+  | C) devig+Poisson @0.3 | 0.5616 | +0.0059 | EKLEME |
+  | C) devig+Poisson @0.5 | 0.5686 | +0.0129 | EKLEME |
+  | C) devig+Poisson @0.7 | 0.5779 | +0.0222 | EKLEME |
+  | D) devig+Elo+Poiss @0.3 | 0.5769 | +0.0212 | EKLEME |
+  | D) devig+Elo+Poiss @0.34 | 0.5810 | +0.0253 | EKLEME |
+  | D) Poisson+Elo @0.5 (devig'siz) | 0.6215 | +0.0658 | EKLEME |
+
+  docs/03'ün "iyileşmiyorsa EKLEME" kuralı devreye girer. **Sonuç:**
+  Nostradamus motoru **devig-only** olarak kalır — Shin's method + B365/PS
+  kapanış 1X2 medyanı. Bu, projenin ana tezinin (bahis piyasası zaten tüm
+  kamuoyu bilgisini fiyatlıyor, ek sinyal gürültü ekler) doğrulanmasıdır.
+
+- Backtest script'leri (`backtest_devig_baseline.py`,
+  `backtest_poisson_elo.py`, `fetch_clubelo_cache.py`) repoda TUTULUR —
+  ileride yeni sezon verisi eklendiğinde veya piyasa verimi değiştiğinde
+  yeniden değerlendirme yapmak için. Ama üretim motoru bunları kullanmaz.
+
+**Sıradaki adım:** `06_TRANSFER_PENCERESI.md`'nin kodlanması —
+`ingest_price_updates.py` desenini kopyalayarak `ingest_transfer_window.py`
+ve `is_active` kolonu.
+
+---
+
+## 12 Ağustos 2026 (oturum 2, devam 2) — Transfer penceresi mekanizması kodlandı
+
+**Yapıldı:**
+- `ingest_transfer_window.py` yazıldı — `ingest_price_updates.py`'nin
+  `_get_or_create_headers` desenini birebir kopyalayarak `is_active`
+  kolonunu otomatik ekler. 3 işlem tipi: `in` (yeni oyuncu), `out`
+  (pasifleştir), `move` (takım değiştir).
+- `validator.py`'ye `validate_transfer_window` fonksiyonu eklendi —
+  transfer_type, position, new_price_tl zorunlu alan/aralık kontrolü.
+- `data_loader.py`'nin `load_players()` fonksiyonuna `is_active` filtresi
+  eklendi (kolon yoksa geriye dönük uyumlu — eski Excel dosyaları
+  çalışmaya devam ediyor, kadro motoru DOKUNULMADI).
+- `transfer_prompti.md` yazıldı — `web_arastirma_prompti.md` ve
+  `fiyat_guncelleme_prompti.md` ile aynı formatta, web AI kopyala-yapıştır
+  promptu. Transfermarkt öncelikli kaynak.
+
+**Araştırıldı (kaynak + sonuç):**
+- `ingest_price_updates.py`'nin `_get_or_create_headers` deseni:
+  header satırını bulur, `is_active` yoksa son kolona ekler, tüm mevcut
+  satırlar için varsayılan değer (1) yazar — birebir kopyalandı.
+- Yeni player_id üretiminde bug bulundu ve düzeltildi: `_next_player_id`
+  tek çağrıda max+1 veriyor, birden çok "in" transferinde aynı ID'yi
+  veriyordu. Çözüm: `next_id_counter` ile her "in" için artan offset.
+- `ws.max_row + 1` yerine gerçek son dolu satırı bulan döngü kullanıldı
+  (openpyxl bazen None dolu "hayalet" satırları sayıyor).
+
+**Kararlaştırıldı (ve neden):**
+- 3 işlem tipi (`in`/`out`/`move`) yeterli — `reactivate` ayrı tip
+  olarak eklenmedi, çünkü "pasif oyuncunun geri dönüşü" nadir bir durum
+  ve uyarı mesajı operatöre manuel müdahaleyi işaret ediyor (docs/06'nın
+  "satır silinmez" kuralıyla uyumlu).
+- `last_season_*` alanları yeni oyuncular için BOŞ bırakıldı (uydurma
+  veri yazılmadı) — docs/06'nın "uydurma değer girme" kuralıyla uyumlu.
+  `xp_model.py`'nin soğuk-başlangıç önseli bu boşlukları fiyat-tabanlı
+  prior'la dolduruyor.
+
+**Test sonuçları:**
+- Orijinal Excel'de (is_active yok): optimizer 443 oyuncuyla çalıştı,
+  geriye dönük uyumlu.
+- Test Excel'inde (1 oyuncu is_active=0): "1 pasif oyuncu filtrelendi,
+  MILP'e 444 aktif oyuncu giriyor" mesajı, optimizer çalıştı.
+- Dry-run modu: 2 yeni oyuncu, 2 red (validasyon), 2 eşleşmeyen isim
+  raporlandı. --apply modu: 2 yeni oyuncu (PLY444, PLY445) doğru şekilde
+  eklendi, boş satır bırakılmadı.
+
+**Sıradaki adım:** `.bat` menü sistemi (docs/05'teki iskeletin
+tamamlanması) + `docs/09_OPERATOR_CEKLISTI.md` (yeni belge).
+
+---
+
+## 12 Ağustos 2026 (oturum 2, devam 3) — Nostradamus production + .bat menü + operatör checklist
+
+**Yapıldı:**
+- `nostradamus_predict.py` yazıldı — `backtest_devig_baseline.py` ile
+  birebir aynı devig mantığı (Shin + B365/PS medyanı), ama production
+  kullanımı için: JSON girdi (9 maç + kapanış 1X2 oranları) → konsol
+  + JSON çıktı (1-X-2 tahminleri + olasılıklar + güven skoru).
+- `menu.bat` yazıldı — Windows batch dosyası, 7 ana menü + 2 alt-menü:
+  - [0] Hafta no ayarla, [1] Excel seç, [2] Kadro, [3] Nostradamus,
+    [4] Web AI alt-menü (sakatlık/fiyat/sonuç/transfer), [5] Transfer
+    kısayolu, [6] Backtest alt-menü (devig baseline + Poisson/Elo
+    karşılaştırma), [7] Çıkış.
+  - Her ingest script çağrısı dry-run önce, "Uygulansın mı? (e/h)"
+    onayı sonrası --apply deseninde.
+- `docs/05` güncellendi — placeholder'lar gerçek dosya adlarıyla
+  değiştirildi, menü seçeneklerinin tam listesi eklendi.
+- `docs/09_OPERATOR_CEKLISTI.md` yazıldı (yeni belge) — operatörün
+  sistem çıktısını TFF Fantezi Lig uygulamasına elle uygulama rehberi:
+  - Zaman kısıtları (deadline = haftanın ilk maçından 1 saat önce,
+    menajer kartı son 15 dk'da alınamaz)
+  - Haftalık zaman çizelgesi (T-48h, T-24h, T-2h, T-1h, deadline sonrası)
+  - TFF'ye elle giriş sırası: kadro → formasyon → kaptan → yedek sırası →
+    Nostradamus → menajer kartı
+  - Sık karşılaşılan sorunlar ve çözümleri
+- `docs/00`'a `09_OPERATOR_CEKLISTI.md` dosya listesine eklendi +
+  başarı kriterleri güncellendi (Nostradamus baseline + transfer
+  penceresi TAMAMLANDI olarak işaretlendi).
+
+**Araştırıldı (kaynak + sonuç):**
+- `nostradamus_predict.py`'nin iki girdi formatı desteklemesi gerekti:
+  çoklu bahisçi (`"odds": {"B365": {...}, "PS": {...}}`) ve basit
+  tek-bahisçi (`"odds_h"`, `"odds_d"`, `"odds_a"`). Operatör bazen
+  sadece tek kaynak bulabiliyor — esneklik gerekli.
+- Windows batch (.bat) dosyalarında Türkçe karakter sorunu: `chcp 65001`
+  ile UTF-8 kodlama ayarlandı (Türkçe karakterler konsolda düzgün görünsün).
+- TFF Fantezi Lig uygulamasının deadline/menajer kartı kuralları
+  (docs/01'den teyit): son 15 dakikada menajer kartı satın alınamaz,
+  kadro deadline'dan 1 saat önce kilitlenir — docs/09'a zaman çizelgesi
+  olarak işlendi.
+
+**Kararlaştırıldı (ve neden):**
+- `nostradamus_predict.py`'nin Poisson/Elo katmanları KULLANILMIYOR —
+  docs/07 önceki girişine göre baseline'ı geçemediler. Script sadece
+  devig-only mode kullanır, ama backtest script'leri repoda tutulur
+  (ileride yeniden değerlendirme için).
+- `.bat` menüsünde her ingest script'i için "Uygulansın mı? (e/h)"
+  onayı ZORUNLU — `--apply`'i doğrudan çağırmak yok. Bu, docs/05'teki
+  "dry-run önce, onay sonrası apply" güvenlik deseni.
+- `docs/09`'da "API ile otomatikleştirilemez" dürüstlük notu tekrarlandı
+  — bu sistemin kalıcı sınırı, gelecekte TODO değil (docs/04 ile uyumlu).
+
+**Test sonuçları:**
+- `nostradamus_predict.py` 9 maçlık örnek JSON ile test edildi:
+  tüm maçlar için tahmin üretildi (B365+PS medyanı + basit tek-bahisçi
+  formatı karışık), 0 hata.
+- `menu.bat`'ın mantığı sadece Linux ortamında simüle edilebiliyor
+  (Windows batch), ama Python script'leri çağrıları doğrulandı.
+- `ingest_transfer_window.py` önceki girişte test edilmişti.
+
+**Sıradaki adım:** Tüm değişiklikler commit edilecek (mesajlarda model/
+araç adı geçmeyecek şekilde), sonra push.
+
+---
+
 ## [SONRAKİ OTURUM İÇİN ŞABLON — kopyala, doldur]
 ## <Tarih> — <kısa başlık>
 **Yapıldı:**

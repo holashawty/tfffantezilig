@@ -1,0 +1,29 @@
+# Python önbellek
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test/çalıştırma çıktıları (operator tarafından üretilir, repoda tutulmaz)
+gw*_kadro_onerisi.xlsx
+nostradamus_predict_gw*.json
+web_research_gw*.json
+fiyat_gw*.json
+match_sonuclari_gw*.json
+transfer_pencere_*.json
+nostradamus_fixtures_gw*.json
+
+# ClubElo cache (fetch_clubelo_cache.py ile tekrar üretilir, repoda tutulmaz)
+nostradamus/cache/
+
+# Geçici/backup dosyaları
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

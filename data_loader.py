@@ -57,6 +57,18 @@ def load_players(path: str) -> pd.DataFrame:
     else:
         df["price_tl"] = df["price_tl_base"]
     df["play_probability"] = df["play_probability"].fillna(1.0).clip(0.0, 1.0)
+
+    # Transfer penceresi destegi (bkz. docs/06): is_active kolonu varsa
+    # pasif oyunculari (is_active=0) MİLP'e HİÇ GİRME — satır silinmez,
+    # sadece filtrelenir. Geçmiş GameweekLog referansları korunur.
+    # Kolon yoksa (eski Excel dosyaları) tüm oyuncular aktif kabul edilir.
+    if "is_active" in df.columns:
+        n_before = len(df)
+        df = df[df["is_active"].fillna(1).astype(int) == 1].reset_index(drop=True)
+        n_filtered = n_before - len(df)
+        if n_filtered > 0:
+            print(f"[BILGI] {n_filtered} pasif oyuncu (is_active=0) filtrelendi, "
+                  f"MILP'e {len(df)} aktif oyuncu giriyor.")
     return df
 
 

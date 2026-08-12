@@ -112,3 +112,66 @@ def validate_price_updates(prices: list, min_price=1_000_000, max_price=25_000_0
         else:
             res.valid_records.append(rec)
     return res
+
+
+# Transfer penceresi için izin verilen değerler (data_loader.py ile uyumlu)
+VALID_TRANSFER_TYPES = {"in", "out", "move"}
+VALID_POSITIONS = {
+    "GK - Kaleci", "DEF - Defans", "MID - Orta Saha", "FWD - Forvet",
+}
+
+
+def validate_transfer_window(transfers: list, total_player_count: int = 0) -> ValidationResult:
+    """Transfer penceresi kayıtlarını doğrular.
+
+    Beklenen JSON şeması (transfer_prompti.md ile üretilir):
+        {
+          "transfer_date": "YYYY-MM-DD",
+          "transfers": [
+            {
+              "player_name": "...",          # zorunlu
+              "transfer_type": "in|out|move", # zorunlu
+              "team": "...",                  # 'in' ve 'move' için zorunlu
+              "position": "GK - Kaleci",      # 'in' için zorunlu
+              "new_price_tl": 5000000,        # 'in' için opsiyonel (verilmezse fiyat=2M)
+              "source_note": "..."            # opsiyonel ama önerilen
+            }
+          ]
+        }
+
+    transfer_type anlamları:
+      - "in":  yeni oyuncu Süper Lig'e geliyor (yeni player_id atanır)
+      - "out": oyuncu Süper Lig'den ayrılıyor (is_active=0, satır SİLİNMEZ)
+      - "move": oyuncu Süper Lig içinde takım değiştiriyor (team alanı güncellenir)
+    """
+    res = ValidationResult()
+    for rec in transfers:
+        err = _require_fields(rec, ["player_name", "transfer_type"])
+        if not err:
+            tt = rec.get("transfer_type")
+            if tt not in VALID_TRANSFER_TYPES:
+                err = f"transfer_type='{tt}' geçersiz (olmalı: {sorted(VALID_TRANSFER_TYPES)})"
+            elif tt == "in":
+                # yeni oyuncu — team ve position zorunlu
+                err = _require_fields(rec, ["team", "position"])
+                if not err and rec.get("position") not in VALID_POSITIONS:
+                    err = f"position='{rec.get('position')}' geçersiz (olalı: {sorted(VALID_POSITIONS)})"
+                if not err and rec.get("new_price_tl") is not None:
+                    err = _check_range(rec, "new_price_tl", 1_000_000, 25_000_000)
+            elif tt == "move":
+                # takım değiştirme — team zorunlu (yeni takım)
+                err = _require_fields(rec, ["team"])
+        if err:
+            res.rejected_records.append((rec, err))
+        else:
+            res.valid_records.append(rec)
+
+    if total_player_count > 0:
+        # transfer penceresi genelde az kayıt içerir — beklenen aralık 1-50
+        if len(res.valid_records) > 100:
+            res.warnings.append(
+                f"Transfer kaydı sayısı ({len(res.valid_records)}) yüksek — "
+                f"tek bir pencere için 100'den fazla transfer beklenmez, "
+                f"JSON'u kontrol et."
+            )
+    return res
