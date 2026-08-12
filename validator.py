@@ -1,0 +1,114 @@
+"""
+validator.py
+------------
+Web-arastirma/sonuc/fiyat guncellemelerinin Excel'e islenmeden once
+gectigi ortak "kontrolcu" katmani. Hicbir ingest script'i bu kontrolden
+gecmeyen bir kaydi SESSIZCE uygulamaz.
+
+Iki tur kontrol:
+  1. KAYIT-DUZEYINDE (hard): zorunlu alan eksikse veya deger mantik
+     disi bir aralikta ise (ornegin play_probability 1.4) o kayit
+     REDDEDILIR — eslesmeyen isim gibi ayri listelenir, uygulanmaz.
+  2. BATCH-DUZEYINDE (soft/uyari): toplam kapsam beklenenden cok
+     dusukse (ornegin 443 oyuncudan sadece 12'si icin veri geldi)
+     UYARI basilir ama --apply engellenmez — bu bazen normal olabilir
+     (ornegin sadece sakatlari raporlayan bir hafta), karar kullaniciya
+     birakilir.
+"""
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ValidationResult:
+    valid_records: list = field(default_factory=list)
+    rejected_records: list = field(default_factory=list)  # (record, reason)
+    warnings: list = field(default_factory=list)
+
+    def print_report(self, label: str):
+        print(f"\n--- VERI KALITE RAPORU: {label} ---")
+        print(f"Gecerli kayit: {len(self.valid_records)}  |  "
+              f"Reddedilen: {len(self.rejected_records)}  |  "
+              f"Uyari: {len(self.warnings)}")
+        if self.rejected_records:
+            print("REDDEDILENLER (uygulanmayacak):")
+            for rec, reason in self.rejected_records:
+                name = rec.get("player_name", "?")
+                print(f"  - {name}: {reason}")
+        for w in self.warnings:
+            print(f"  [UYARI] {w}")
+
+
+def _require_fields(record: dict, fields: list) -> str | None:
+    for f in fields:
+        if record.get(f) in (None, ""):
+            return f"zorunlu alan eksik: '{f}'"
+    return None
+
+
+def _check_range(record: dict, field_name: str, lo: float, hi: float) -> str | None:
+    val = record.get(field_name)
+    if val is None:
+        return None
+    try:
+        val = float(val)
+    except (TypeError, ValueError):
+        return f"'{field_name}' sayi degil: {val!r}"
+    if not (lo <= val <= hi):
+        return f"'{field_name}'={val} beklenen aralik disinda [{lo}, {hi}]"
+    return None
+
+
+def validate_injury_updates(updates: list, total_player_count: int) -> ValidationResult:
+    res = ValidationResult()
+    for rec in updates:
+        err = _require_fields(rec, ["player_name", "play_probability"])
+        if not err:
+            err = _check_range(rec, "play_probability", 0.0, 1.0)
+        if err:
+            res.rejected_records.append((rec, err))
+        else:
+            res.valid_records.append(rec)
+
+    if total_player_count > 0:
+        coverage = len(res.valid_records) / total_player_count
+        if coverage > 0.5:
+            res.warnings.append(
+                f"Guncelleme sayisi ({len(res.valid_records)}) toplam kadronun "
+                f"%{coverage*100:.0f}'i — bu genelde sadece birkac oyuncuyu "
+                f"kapsayan bir sakatlik/ceza raporu icin cok yuksek, kaynagi "
+                f"kontrol et (belki gereksiz/uydurma satirlar var)."
+            )
+    return res
+
+
+def validate_match_results(results: list) -> ValidationResult:
+    res = ValidationResult()
+    for rec in results:
+        err = _require_fields(rec, ["player_name"])
+        if not err:
+            err = _check_range(rec, "minutes", 0, 120)
+        if not err:
+            err = _check_range(rec, "goals", 0, 10)
+        if not err:
+            err = _check_range(rec, "assists", 0, 10)
+        if not err and rec.get("fantasy_points") is not None:
+            err = _check_range(rec, "fantasy_points", -20, 50)
+        if err:
+            res.rejected_records.append((rec, err))
+        else:
+            res.valid_records.append(rec)
+    return res
+
+
+def validate_price_updates(prices: list, min_price=1_000_000, max_price=25_000_000) -> ValidationResult:
+    res = ValidationResult()
+    for rec in prices:
+        err = _require_fields(rec, ["player_name", "price_tl"])
+        if not err:
+            err = _check_range(rec, "price_tl", min_price, max_price)
+        if err:
+            res.rejected_records.append((rec, err))
+        else:
+            res.valid_records.append(rec)
+    return res
