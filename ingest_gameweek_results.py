@@ -43,6 +43,7 @@ import openpyxl
 
 from data_loader import load_players
 from validator import validate_match_results
+from backup_utils import backup_excel
 
 NAME_MATCH_THRESHOLD = 0.82
 
@@ -121,6 +122,9 @@ def main():
     if not args.apply:
         print("\n[DRY-RUN] GameweekLog'a yazilmadi. Onayliyorsan --apply ile tekrar calistir.")
         return
+
+    # --apply oncesi Excel yedegi al (docs/07 13 Agustos 2026 karari)
+    backup_excel(args.excel_path)
 
     wb = openpyxl.load_workbook(args.excel_path)
     ws = wb["GameweekLog"]

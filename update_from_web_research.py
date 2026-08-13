@@ -24,6 +24,7 @@ from difflib import SequenceMatcher
 import openpyxl
 
 from validator import validate_injury_updates
+from backup_utils import backup_excel
 
 NAME_MATCH_THRESHOLD = 0.82  # bunun altinda eslesme "belirsiz" sayilir
 
@@ -136,6 +137,9 @@ def main():
     if not args.apply:
         print("\n[DRY-RUN] Hicbir sey yazilmadi. Onayliyorsan --apply ile tekrar calistir.")
         return
+
+    # --apply oncesi Excel yedegi al (docs/07 13 Agustos 2026 karari)
+    backup_excel(args.excel_path)
 
     for m in matched:
         ws.cell(row=m["row"], column=headers["play_probability"]).value = m["new_prob"]

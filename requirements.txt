@@ -1,9 +1,17 @@
+# TFF Fantezi Lig Sistemi - Python bağımlılıkları
+# Kurulum: pip install -r requirements.txt
+#
+# Not: penaltyblog ve soccerdata SADECE backtest script'leri için
+# (nostradamus/backtest_poisson_elo.py, fetch_clubelo_cache.py).
+# Üretim kadro/Nostradamus tahmin motoru bunları KULLANMIYOR.
+
+# === Üretim (kadro + Nostradamus + ingest) ===
 pandas>=2.0
 numpy>=1.24
-scipy>=1.10
-openpyxl>=3.1
+scipy>=1.10          # MILP solver (HiGHS) — kadro optimizasyonu
+openpyxl>=3.1        # Excel okuma/yazma
+shin>=0.2.2          # devig (Shin's method) - Nostradamus baseline, kritik
 
-# Nostradamus motoru (bkz. docs/03)
-shin>=0.2.2          # devig (Shin's method) - baseline, kritik
-penaltyblog>=1.11.0  # Dixon-Coles / Elo denemeleri (bkz. docs/07 - baseline'i gecemedi, opsiyonel)
-soccerdata>=1.9.1    # ClubElo fetch (opsiyonel, sadece nostradamus/fetch_clubelo_cache.py icin)
+# === Sadece backtest (opsiyonel, üretimde kullanılmıyor) ===
+penaltyblog>=1.11.0  # Dixon-Coles (bkz. docs/07 - baseline'i gecemedi, opsiyonel)
+soccerdata>=1.9.1    # ClubElo fetch (sadece nostradamus/fetch_clubelo_cache.py icin)

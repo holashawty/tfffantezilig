@@ -332,6 +332,129 @@ kısa promptlar, ekran temizleme, renkli çıktı).
 
 ---
 
+## 13 Ağustos 2026 (oturum 3) — 3 kritik madde + opsiyonel test + CRLF düzeltmesi
+
+**Yapıldı:**
+
+### 1. (KRİTİK) Excel yazma öncesi otomatik yedek
+- `backup_utils.py` yazıldı — `backup_excel(path)` fonksiyonu.
+  Yedek adı: `backups/<excel_adı>_YYYYMMDD_HHMMSS.xlsx`
+  Excel dosyasiyla ayni klasorde `backups/` altinda.
+- 4 ingest script'ine `--apply` bloğunda `wb.save()`'den ÖNCE
+  `backup_excel(args.excel_path)` çağrısı eklendi:
+  - `ingest_price_updates.py`
+  - `ingest_transfer_window.py`
+  - `update_from_web_research.py`
+  - `ingest_gameweek_results.py`
+- `.gitignore`'a `backups/` eklendi (kullanıcı-local, repoya ALINMAZ).
+- Test: `ingest_price_updates.py --apply` çalıştırınca backup oluştu,
+  orijinal dosya doğru güncellendi.
+
+### 2. (KRİTİK) `örnek_kadro_yapısı.xlsx` silindi
+- Dosyada Uğurcan Çakır "Çorum FK" gösteriliyordu (gerçekte Galatasaray)
+  — eski test çalıştırmasından kalma bayat veri.
+- docs/'ta bu dosyaya **hiç referans yok** (grep ile teyit edildi).
+- Dosya silindi. İhtiyaç olursa `run_gameweek.py` ile yeniden üretilebilir.
+
+### 3. (KRİTİK) Kadro çıktısı biçimlendirme + otomatik aç
+- `run_gameweek.py`'nin `export_result()` fonksiyonu openpyxl ile
+  yeniden yazıldı (pandas `.to_excel` yerine):
+  - Başlık satırı: kalın beyaz yazı, koyu gri (#404040) arka plan,
+    ortalı, 32px yükseklik
+  - `price_tl` kolonu: `#,##0" TL"` formatı (9.000.000 TL)
+  - `xp` kolonu: `0.00` formatı (3.84)
+  - `play_probability`: `0%` formatı (95%)
+  - CAPTAIN satırı: sarı (#FFEB3B) arka plan + ad kalın
+  - VICE_CAPTAIN: açık sarı (#FFF59D) + ad kalın
+  - BENCH: gri (#EEEEEE)
+  - Satırlar pozisyona (GK→DEF→MID→FWD) ve role (CAPTAIN→VICE→STARTER→BENCH) göre sıralı
+  - Freeze panes (A2) — başlık scroll'da sabit
+  - Kolon genişlikleri ayarlı
+- `rehber.bat` [2e] adımında `start "" "gw%GWeek%_kadro_onerisi.xlsx"`
+  ile Excel otomatik açılıyor — kullanıcı "bu dosyayı aç" demeye gerek yok.
+
+### 4. (Opsiyonel) Regresyon testleri
+- `tests/` klasörü açıldı, 3 test dosyası yazıldı:
+  - `test_ingest_price_updates.py` (4 test): dry-run Excel'i değiştirmiyor,
+    --apply kolon ekliyor, fiyat doğru yazılıyor, backup oluşuyor
+  - `test_ingest_transfer_window.py` (4 test): is_active kolonu ekleniyor,
+    "in" yeni ID atıyor (PLY444+), "out" satır silmiyor (is_active=0),
+    çoklu "in" benzersiz ID'ler
+  - `test_optimizer.py` (7 test): squad=15 oyuncu, 2GK/5DEF/5MID/3FWD,
+    bütçe ≤100M, max 3 kulüp, kaptan+vice squad'da, kaptan≠vice
+- **15/15 test başarılı** (`python3 -m unittest discover tests -v`).
+
+### 5. CRLF düzeltmesi (kullanıcı bildirdi)
+- `rehber.bat` ve `menu.bat` Linux'ta LF-only olarak yazılmıştı.
+  Windows `cmd.exe` LF-only .bat dosyalarında `goto`/`if`/`set /p`
+  komutlarını düzgün işlemiyor → Python hatası.
+- `scripts/crlf_convert.py` ile her iki dosya da CRLF'e çevrildi
+  (874 + 252 satır, 0 LF-only kaldı).
+- `.gitattributes` eklendi:
+  ```
+  *.bat text eol=crlf
+  *.cmd text eol=crlf
+  ```
+  Bu sayede gelecekteki commit'lerde .bat dosyaları her ortamda
+  CRLF olarak checkout edilir (Git'autocrlf' ayarı ne olursa olsun).
+
+### 6. `rehber.bat` [1] menüsüne requirements.txt kurulumu
+- `requirements.txt` oluşturuldu:
+  - Üretim: openpyxl, pandas, numpy, scipy, shin
+  - Backtest (opsiyonel): penaltyblog, soccerdata
+- `rehber.bat` [1] İLK KEZ BAŞLIYORUM menüsüne "KONTROL 2: Python
+  kütüphaneleri kurulu mu?" adımı eklendi. Kullanıcıya
+  `pip install -r requirements.txt` çalıştırma seçeneği sunuluyor
+  (ilk kurulumda EVET denmeli).
+
+**Araştırıldı (kaynak + sonuç):**
+- openpyxl PatternFill rengi: `start_color` ve `end_color` aynı olmak
+  zorunda, `fill_type="solid"` olmadan renk görünmüyor. Test'te doğrulandı.
+- Excel number_format: `#,##0" TL"` → `9.000.000 TL` (Türkçe binlik
+  ayırıcı virgül, Excel'in yerel ayarına göre noktaya çevrilir).
+  Test'te format doğru uygulandı.
+- `.gitattributes` `text eol=crlf`: Git bunu zorunlu kılar —
+  `core.autocrlf=false` olsa bile .bat dosyaları CRLF olarak checkout edilir.
+- `python -m pip install -r requirements.txt`: `pip` yerine `python -m pip`
+  kullanıldı (Windows'ta PATH sorunu olmasın diye).
+
+**Kararlaştırıldı (ve neden):**
+- Backup dosya adında timestamp `%Y%m%d_%H%M%S` formatı — aynı gün
+  birden fazla --apply yapılırsa üzerine yazılmasın, her seferinde
+  yeni yedek olsun. Disk dolarsa kullanıcı `backups/`'ı temizler.
+- `backup_excel()` sessizce devam eder (exception fırlatmaz) — eğer
+  backup alınamazsa, uygulamayı durdurmak yerine uyarı verir ve
+  operatör kararı bekler. Çünkü bazen backup diski dolu olabilir,
+  ama asıl uygulama hala yapılmalı (operatör riski kabul ederse).
+- `örnek_kadro_yapısı.xlsx` silmek yerine yeniden üretmek de
+  seçenekti ama dosyanın amacı belirsizdı (hiçbir docs referans
+  vermiyor). Silmek daha temiz — ihtiyaç olursa `run_gameweek.py`
+  ile anında üretilebilir.
+- Test'ler `unittest` ile (pytest değil) — ekstra bağımlılık yok,
+  her Python kurulumunda standart. İleride pytest istenirse `unittest`
+  ile yazılmış test'ler pytest ile de çalışır (geriye dönük uyumlu).
+- `.gitattributes`'ta sadece `.bat`/`.cmd` için `eol=crlf` zorunlu,
+  diğer metin dosyaları (`*.py`, `*.md`) Git'autocrlf' ayarına bırakıldı
+  — Linux geliştiriciler LF, Windows kullanıcıları CRLF alsın.
+
+**Test sonuçları:**
+- `python3 -m unittest discover tests -v` → 15/15 test OK (0.46s + 0.74s + 0.40s).
+- Backup test: `backups/test_oyuncu_20260813_032025.xlsx` oluştu, orijinal
+  dosya boyutu korundu, fiyat doğru yazıldı.
+- Excel biçimlendirme: CAPTAIN satırı `#FFEB3B` (sarı), VICE `#FFF59D`
+  (açık sarı), BENCH `#EEEEEE` (gri), header `#404040` + bold + beyaz.
+  Sayı formatları doğru. Pozisyon+role sıralaması doğru.
+- CRLF: her iki .bat dosyası 0 LF-only satır, tam CRLF.
+
+**Sıradaki adım:** Kullanıcı Windows'ta `rehber.bat`'ı çift tıklayıp
+test edecek. İlk hafta deneyimine göre:
+- [1] kurulum akışı (requirements.txt kurulumu dahil) çalışıyor mu
+- [2e] kadro üretildikten sonra Excel otomatik açılıyor mu
+- Backup dosyaları `backups/` altında birikiyor mu (disk dolarsa
+  temizleme uyarısı verilebilir)
+
+---
+
 ## [SONRAKİ OTURUM İÇİN ŞABLON — kopyala, doldur]
 ## <Tarih> — <kısa başlık>
 **Yapıldı:**

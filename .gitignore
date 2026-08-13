@@ -16,6 +16,9 @@ nostradamus_fixtures_gw*.json
 # ClubElo cache (fetch_clubelo_cache.py ile tekrar üretilir, repoda tutulmaz)
 nostradamus/cache/
 
+# Excel yedekleri (backup_utils.py ile --apply oncesi alınır)
+backups/
+
 # Geçici/backup dosyaları
 *.tmp
 *.bak

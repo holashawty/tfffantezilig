@@ -54,6 +54,7 @@ from difflib import SequenceMatcher
 import openpyxl
 
 from validator import validate_transfer_window
+from backup_utils import backup_excel
 
 
 NAME_MATCH_THRESHOLD = 0.82
@@ -310,6 +311,9 @@ def main():
         return
 
     # ADIM 5: gerçek yazma
+    # --apply oncesi Excel yedegi al (docs/07 13 Agustos 2026 karari)
+    backup_excel(args.excel_path)
+
     # is_active kolonu zaten _get_or_create_headers içinde eklendi (wet-write).
     # Şimdi aksiyonları uygula:
     applied = {"add_new": 0, "deactivate": 0, "change_team": 0}

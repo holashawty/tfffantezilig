@@ -1,0 +1,26 @@
+# .gitattributes
+# Git'in satir sonu islemesini kontrol eder.
+#
+# .bat dosyalari Windows cmd.exe icin CRLF olmali. Git'autocrlf' true'
+# ayari Linux checkout'ta LF'e cevirebilir ve .bat bozulur. Bu yuzden
+# .bat dosyalari icin 'text eol=crlf' zorunlu kiliyoruz - her ortamda
+# CRLF olarak checkout edilir.
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Python ve diger metin dosyalari normal (Git'autocrlf' ayarina birak)
+*.py text
+*.md text
+*.json text
+*.txt text
+*.yml text
+*.yaml text
+*.csv text
+
+# Ikili dosyalar
+*.xlsx binary
+*.db binary
+*.png binary
+*.jpg binary
+*.pdf binary

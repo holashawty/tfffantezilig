@@ -77,7 +77,32 @@ if errorlevel 1 (
 )
 echo   Python: OK
 echo.
-echo --- KONTROL 2: Excel dosyasi yerinde mi? ---
+echo --- KONTROL 2: Python kutuphaneleri kurulu mu? ---
+echo   Gerekli kutuphaneler: openpyxl, pandas, scipy, shin
+echo   (Backtest icin: penaltyblog, soccerdata — opsiyonel)
+echo.
+echo   Kurmak istiyor musun? (Ilk kurulumda EVET demen lazim)
+set /p install_deps="pip install -r requirements.txt calistirilsin mi? (e/h): "
+if /i "!install_deps!"=="e" (
+  echo.
+  echo   Kurulum basliyor...
+  echo.
+  python -m pip install -r requirements.txt
+  if errorlevel 1 (
+    echo.
+    echo [UYARI] Kurulumda hata olustu. Yukaridaki mesaji oku.
+    echo   Tek tek denemek icin: pip install openpyxl pandas scipy shin
+    echo.
+    pause
+  ) else (
+    echo.
+    echo [TAMAM] Kutuphaneler kuruldu.
+  )
+) else (
+  echo   Atlandi. Daha sonra "pip install -r requirements.txt" ile kurabilirsin.
+)
+echo.
+echo --- KONTROL 3: Excel dosyasi yerinde mi? ---
 if not exist "%EXCEL%" (
   echo [HATA] Excel dosyasi bulunamadi: %EXCEL%
   echo   Bu dosya repo ile birlikte gelmeli. Klasorunde oldugundan emin ol.
@@ -87,7 +112,7 @@ if not exist "%EXCEL%" (
 )
 echo   Excel: OK (%EXCEL%)
 echo.
-echo --- KONTROL 3: Prompt dosyalari hazir mi? ---
+echo --- KONTROL 4: Prompt dosyalari hazir mi? ---
 set "prompts=web_arastirma_prompti.md fiyat_guncelleme_prompti.md match_sonuclari_prompti.md transfer_prompti.md"
 set "all_ok=1"
 for %%p in (%prompts%) do (
@@ -105,7 +130,7 @@ if "!all_ok!"=="0" (
   goto ana_menu
 )
 echo.
-echo --- KONTROL 4: Hangi haftadan basliyorsun? ---
+echo --- KONTROL 5: Hangi haftadan basliyorsun? ---
 set /p GWeek="Kacinci haftaya hazirlaniyorsun? (1-38, varsayilan 1): "
 if "!GWeek!"=="" set "GWeek=1"
 echo   Hafta !GWeek! olarak ayarlandi.
@@ -470,8 +495,11 @@ python run_gameweek.py "%EXCEL%" --gameweek %GWeek%
 echo.
 if exist "gw!GWeek!_kadro_onerisi.xlsx" (
   echo [TAMAM] Kadro onerisi hazir: gw!GWeek!_kadro_onerisi.xlsx
-  echo   Bu dosyayi ac (Excel/Calc/Sheets) - icinde 15 oyuncu, kaptan,
-  echo   yedek kaptan ve yedek sirasi var.
+  echo   Dosyayi otomatik aciyorum...
+  start "" "gw!GWeek!_kadro_onerisi.xlsx"
+  echo.
+  echo   Excel acildi. Sari satir = KAPTAN, acik sari = YEDEK KAPTAN,
+  echo   gri satir = BENCH. Satirlar pozisyona gore sirali (GK ^> DEF ^> MID ^> FWD).
   echo.
   echo Siradaki adim: [f] TFF'ye elle gir
 ) else (

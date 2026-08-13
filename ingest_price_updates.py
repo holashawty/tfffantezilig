@@ -30,6 +30,7 @@ from difflib import SequenceMatcher
 import openpyxl
 
 from validator import validate_price_updates
+from backup_utils import backup_excel
 
 NAME_MATCH_THRESHOLD = 0.82
 
@@ -148,6 +149,9 @@ def main():
         print("\n[DRY-RUN] Hicbir sey yazilmadi (kolon eklenmesi dahil). "
               "Onayliyorsan --apply ile tekrar calistir.")
         return
+
+    # --apply oncesi Excel yedegi al (docs/07 13 Agustos 2026 karari)
+    backup_excel(args.excel_path)
 
     for m in matched:
         ws.cell(row=m["row"], column=headers["price_tl_current"]).value = m["new_price"]
