@@ -1,0 +1,9 @@
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+openpyxl>=3.1
+
+# Nostradamus motoru (bkz. docs/03)
+shin>=0.2.2          # devig (Shin's method) - baseline, kritik
+penaltyblog>=1.11.0  # Dixon-Coles / Elo denemeleri (bkz. docs/07 - baseline'i gecemedi, opsiyonel)
+soccerdata>=1.9.1    # ClubElo fetch (opsiyonel, sadece nostradamus/fetch_clubelo_cache.py icin)
