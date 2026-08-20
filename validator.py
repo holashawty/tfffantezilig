@@ -106,6 +106,15 @@ def validate_price_updates(prices: list, min_price=1_000_000, max_price=25_000_0
     for rec in prices:
         err = _require_fields(rec, ["player_name", "price_tl"])
         if not err:
+            # Otomatik birim donusumu: Eger fiyat 100'den kucukse (orn 4.5, 10.0), Milyon TL kabul edip tam TL'ye cevir
+            try:
+                val = float(rec["price_tl"])
+                if 1.0 <= val <= 100.0:
+                    rec["price_tl"] = int(round(val * 1_000_000))
+                else:
+                    rec["price_tl"] = int(round(val))
+            except (ValueError, TypeError):
+                pass
             err = _check_range(rec, "price_tl", min_price, max_price)
         if err:
             res.rejected_records.append((rec, err))

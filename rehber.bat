@@ -1,180 +1,87 @@
 @echo off
-chcp 65001 >nul
-REM ============================================================
-REM TFF Fantezi Lig - REHBER MODU
-REM ------------------------------------------------------------
-REM Bu dosya "menu.bat"'in yaninda yer alir. Farki:
-REM   menu.bat  = arac kutusu (ileri kullanici, ne yapacagini biliyor)
-REM   rehber.bat = sihirbaz (adim adim elinden tutar, sirayi sasirtmaz)
-REM
-REM Kullanici ne zaman musaitse girer. Saat dilimi yok. Her giriste
-REM dosyalardan durumu cikarir, "nerede kaldin?" sorusuna cevap verir.
-REM ============================================================
-
 setlocal enabledelayedexpansion
 
-REM Varsayilan dosya yollari
+REM UTF-8 Karakter seti
+chcp 65001 >nul 2>&1
+
+REM Calisma dizinini BAT dosyasinin bulundugu klasore sabitle
+cd /d "%~dp0"
+
+REM ANSI Renk Kodlari
+set "ESC= "
+set "C_RESET= [0m"
+set "C_BOLD= [1m"
+set "C_CYAN= [96m"
+set "C_GREEN= [92m"
+set "C_YELLOW= [93m"
+set "C_BLUE= [94m"
+set "C_MAGENTA= [95m"
+set "C_RED= [91m"
+set "C_WHITE= [97m"
+set "C_GRAY= [90m"
+
+REM Varsayilan Ayarlar
 set "EXCEL=oyuncu_veritabani.xlsx"
-set "GWeek=1"
+set "GWeek=2"
 
 :ana_menu
 cls
-echo ==================================================================
-echo   TFF FANTEZI LIG - REHBER MODU
-echo ==================================================================
-echo   Bu program seni adim adim yonlendirecek. Ne yapacagini bilmesen
-echo   bile, sirayla ilerlersen her sey tamam olur.
+echo %C_CYAN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%                  ⚡ TFF FANTEZI LIG YONETIM MERKEZI ⚡%C_RESET%
+echo %C_CYAN%==================================================================%C_RESET%
+echo   %C_YELLOW%● Aktif Hafta       :%C_RESET% %C_BOLD%%C_GREEN%Hafta !GWeek!%C_RESET%
+echo   %C_YELLOW%● Aktif Veritabani  :%C_RESET% %C_WHITE%!EXCEL!%C_RESET%
+echo %C_CYAN%==================================================================%C_RESET%
 echo.
-echo   Aktif Excel : %EXCEL%
-echo   Aktif Hafta : %GWeek%
-echo ------------------------------------------------------------------
+echo   %C_BOLD%%C_GREEN%[1] YENI HAFTA HAZIRLIGI (Maclar Baslamadan Once / Deadline)%C_RESET%
+echo       %C_GRAY%:: 1-Tikla Express Mod veya Adim Adim: Fiyat, Sakatlik, Kadro Optimizasyonu%C_RESET%
 echo.
-echo   [1] ILK KEZ BASLIYORUM  (sezon basi, tek seferlik kurulum)
-echo   [2] YENI HAFTA HAZIRLIGI (deadline'dan once yapilacaklar)
-echo   [3] MAQLAR BITTI - SONUQLARI GIR (hafta sonrasi)
-echo   [4] TRANSFER PENCERESI  (sadece sezon ortasi, 17. hafta sonrasi)
-echo   [5] SISTEM DURUMU - nerede kaldim, ne yapmaliyim?
-echo   [6] BACKTEST - sistem dogru calisiyor mu? (aylik kontrol)
-echo   [0] CIKIS
-echo ==================================================================
-set /p secim="Secim [0-6]: "
+echo   %C_BOLD%%C_BLUE%[2] GECEN HAFTANIN VERILERINI ISLE (Maclar Bittikten Sonra)%C_RESET%
+echo       %C_GRAY%:: 9 Macin Skorlari, Kartlar, Puanlar, GameweekLog ^& SeasonStats Guncelleme%C_RESET%
+echo.
+echo   %C_BOLD%%C_MAGENTA%[3] SISTEM AYARLARI VE LIDERLIK TABLOSU%C_RESET%
+echo       %C_GRAY%:: Hafta No Degistir, Excel'i Ac, Sezonluk Liderlik Tablosunu Gor%C_RESET%
+echo.
+echo   %C_RED%[0] Cikis%C_RESET%
+echo %C_CYAN%==================================================================%C_RESET%
+set /p anasecim="%C_BOLD%%C_YELLOW%Seciminiz [0-3]: %C_RESET%"
 
-if "%secim%"=="1" goto ilk_kurulum
-if "%secim%"=="2" goto yeni_hafta
-if "%secim%"=="3" goto maclar_bitti
-if "%secim%"=="4" goto transfer_penceresi
-if "%secim%"=="5" goto sistem_durumu
-if "%secim%"=="6" goto backtest
-if "%secim%"=="0" goto cikis
+if "!anasecim!"=="1" goto yeni_hafta
+if "!anasecim!"=="2" goto maclar_bitti
+if "!anasecim!"=="3" goto ayarlar_menu
+if "!anasecim!"=="0" goto cikis
 goto ana_menu
 
-REM ============================================================
-REM [1] ILK KEZ BASLIYORUM
-REM ============================================================
-:ilk_kurulum
-cls
-echo ==================================================================
-echo   [1] ILK KEZ BASLIYORUM - Sezon Basi Kurulumu
-echo ==================================================================
-echo.
-echo Bu adim sezonun BASINDA bir kere yapilir. Amaci:
-echo   - Python kurulu mu kontrol etmek
-echo   - Excel dosyasi yerinde mi kontrol etmek
-echo   - Prompt dosyalari hazir mi kontrol etmek
-echo   - Hangi haftadan basladigini kaydetmek
-echo.
-echo --- KONTROL 1: Python kurulu mu? ---
-python --version 2>nul
-if errorlevel 1 (
-  echo.
-  echo [HATA] Python bulunamadi!
-  echo   Python'u https://python.org indir ve kur.
-  echo   Kurarken "Add Python to PATH" kutusunu ISARETLE.
-  echo   Kurduktan sonra bu menuye geri don.
-  echo.
-  pause
-  goto ana_menu
-)
-echo   Python: OK
-echo.
-echo --- KONTROL 2: Python kutuphaneleri kurulu mu? ---
-echo   Gerekli kutuphaneler: openpyxl, pandas, scipy, shin
-echo   (Backtest icin: penaltyblog, soccerdata — opsiyonel)
-echo.
-echo   Kurmak istiyor musun? (Ilk kurulumda EVET demen lazim)
-set /p install_deps="pip install -r requirements.txt calistirilsin mi? (e/h): "
-if /i "!install_deps!"=="e" (
-  echo.
-  echo   Kurulum basliyor...
-  echo.
-  python -m pip install -r requirements.txt
-  if errorlevel 1 (
-    echo.
-    echo [UYARI] Kurulumda hata olustu. Yukaridaki mesaji oku.
-    echo   Tek tek denemek icin: pip install openpyxl pandas scipy shin
-    echo.
-    pause
-  ) else (
-    echo.
-    echo [TAMAM] Kutuphaneler kuruldu.
-  )
-) else (
-  echo   Atlandi. Daha sonra "pip install -r requirements.txt" ile kurabilirsin.
-)
-echo.
-echo --- KONTROL 3: Excel dosyasi yerinde mi? ---
-if not exist "%EXCEL%" (
-  echo [HATA] Excel dosyasi bulunamadi: %EXCEL%
-  echo   Bu dosya repo ile birlikte gelmeli. Klasorunde oldugundan emin ol.
-  echo.
-  pause
-  goto ana_menu
-)
-echo   Excel: OK (%EXCEL%)
-echo.
-echo --- KONTROL 4: Prompt dosyalari hazir mi? ---
-set "prompts=web_arastirma_prompti.md fiyat_guncelleme_prompti.md match_sonuclari_prompti.md transfer_prompti.md"
-set "all_ok=1"
-for %%p in (%prompts%) do (
-  if exist "%%p" (
-    echo   %%p : OK
-  ) else (
-    echo   %%p : EKSIK!
-    set "all_ok=0"
-  )
-)
-if "!all_ok!"=="0" (
-  echo.
-  echo [HATA] Baz prompt dosyalari eksik. Repoyu yeniden indir.
-  pause
-  goto ana_menu
-)
-echo.
-echo --- KONTROL 5: Hangi haftadan basliyorsun? ---
-set /p GWeek="Kacinci haftaya hazirlaniyorsun? (1-38, varsayilan 1): "
-if "!GWeek!"=="" set "GWeek=1"
-echo   Hafta !GWeek! olarak ayarlandi.
-echo.
-echo ==================================================================
-echo   KURULUM TAMAM!
-echo ==================================================================
-echo   Simdi [2] YENI HAFTA HAZIRLIGI'na gec.
-echo   Orada sistem seni adim adim yonlendirecek:
-echo     2a. Sakatlik/ceza verisi topla
-echo     2b. Fiyat verisi topla
-echo     2c. Nostradamus oranlari topla
-echo     2d. Sisteme yukle
-echo     2e. Kadro optimizasyonu
-echo     2f. TFF'ye elle gir
-echo.
-pause
-goto ana_menu
 
 REM ============================================================
-REM [2] YENI HAFTA HAZIRLIGI
+REM [1] YENI HAFTA HAZIRLIGI (DEADLINE ONCESI)
 REM ============================================================
 :yeni_hafta
 cls
-echo ==================================================================
-echo   [2] YENI HAFTA HAZIRLIGI - Hafta %GWeek%
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1] YENI HAFTA HAZIRLIGI - Hafta !GWeek! (Deadline Oncesi)%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
+echo   %C_YELLOW%Hedef: Deadline oncesi en guncel verilerle 15 kisilik en iyi kadroyu kurmak.%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Bu adim haftanin ilk macindan ONCE yapilmali (deadline = ilk mac
-echo saatinden 1 saat once). Sistem 6 alt-adimda seni yonlendirecek.
+echo   %C_BOLD%%C_CYAN%*** EN HIZLI VE OTOMATIK YONTEM:%C_RESET%
+echo   %C_BOLD%%C_GREEN%[x] HIZLI MOD (1-Tikla Express Pipeline)%C_RESET%
+echo       %C_GRAY%Mevcut JSON'lari algilar, Excel'i gunceller, MILP kadroyu cozer ve acar.%C_RESET%
 echo.
-echo Hangi adimdasin? (Emin degilsen 0 sec, sistem soyler)
+echo   %C_BOLD%%C_WHITE%--- ADIM ADIM MANUEL REHBER ---%C_RESET%
+echo   %C_WHITE%[a]%C_RESET% Sakatlik/Ceza Verisi Topla %C_GRAY%(AI Promptu ile 0dk/0xp filtreleme)%C_RESET%
+echo   %C_WHITE%[b]%C_RESET% Guncel Fiyatlari Topla %C_GRAY%(tfffantezilig.com 1-tikla indirme)%C_RESET%
+echo   %C_WHITE%[c]%C_RESET% Nostradamus Oranlari Topla %C_GRAY%(Oddsportal canli 1X2 oranlari)%C_RESET%
+echo   %C_WHITE%[d]%C_RESET% Toplanan JSON'lari Sisteme Isle %C_GRAY%(Dry-run onayi ile)%C_RESET%
+echo   %C_WHITE%[e]%C_RESET% Matematiksel Kadro Optimizasyonu %C_GRAY%(gw!GWeek!_kadro_onerisi.xlsx)%C_RESET%
+echo   %C_WHITE%[f]%C_RESET% TFF Uygulamasina Kadroyu Girme Rehberi
 echo.
-echo   [a] Sakatlik/ceza verisi topla
-echo   [b] Fiyat verisi topla
-echo   [c] Nostradamus oranlari topla
-echo   [d] Sisteme yukle (3 JSON'i isle)
-echo   [e] Kadro optimizasyonu
-echo   [f] TFF'ye elle gir
-echo   [0] Hangi adimda kaldigimi soyle
-echo   [9] Ana menuye don
-echo.
-set /p adim="Secim: "
+echo   %C_YELLOW%[0] Dosya Durumu Kontrolu%C_RESET%
+echo   %C_RED%[9] Ana Menuye Don%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
+set /p adim="%C_BOLD%%C_YELLOW%Seciminiz: %C_RESET%"
 
+if /i "!adim!"=="x" goto adim_2x
 if /i "!adim!"=="a" goto adim_2a
 if /i "!adim!"=="b" goto adim_2b
 if /i "!adim!"=="c" goto adim_2c
@@ -187,688 +94,281 @@ goto yeni_hafta
 
 :adim_durumu
 cls
-echo ==================================================================
-echo   ADIM DURUMU - Hafta %GWeek%
-echo ==================================================================
-echo.
-echo Mevcut JSON dosyalarin:
+echo %C_CYAN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  HAFTA !GWeek! DOSYA VE HAZIRLIK DURUMU%C_RESET%
+echo %C_CYAN%==================================================================%C_RESET%
 echo.
 if exist "web_research_gw!GWeek!.json" (
-  echo   [a] Sakatlik : HAZIR (web_research_gw!GWeek!.json)
+  echo   [a] Sakatlik/Ceza JSON : %C_GREEN%[HAZIR]%C_RESET% (web_research_gw!GWeek!.json)
 ) else (
-  echo   [a] Sakatlik : EKSIK - henuz olusturulmadi
+  echo   [a] Sakatlik/Ceza JSON : %C_RED%[EKSIK]%C_RESET%
 )
 if exist "fiyat_gw!GWeek!.json" (
-  echo   [b] Fiyat    : HAZIR (fiyat_gw!GWeek!.json)
+  echo   [b] Fiyat Verisi JSON  : %C_GREEN%[HAZIR]%C_RESET% (fiyat_gw!GWeek!.json)
 ) else (
-  echo   [b] Fiyat    : EKSIK - henuz olusturulmadi
+  echo   [b] Fiyat Verisi JSON  : %C_RED%[EKSIK]%C_RESET%
 )
 if exist "nostradamus_fixtures_gw!GWeek!.json" (
-  echo   [c] Oranlar  : HAZIR (nostradamus_fixtures_gw!GWeek!.json)
+  echo   [c] Oranlar JSON       : %C_GREEN%[HAZIR]%C_RESET% (nostradamus_fixtures_gw!GWeek!.json)
 ) else (
-  echo   [c] Oranlar  : EKSIK - henuz olusturulmadi
+  echo   [c] Oranlar JSON       : %C_RED%[EKSIK]%C_RESET%
 )
 if exist "gw!GWeek!_kadro_onerisi.xlsx" (
-  echo   [e] Kadro    : HAZIR (gw!GWeek!_kadro_onerisi.xlsx)
+  echo   [e] Kadro Onerisi      : %C_GREEN%[URETILDI]%C_RESET% (gw!GWeek!_kadro_onerisi.xlsx)
 ) else (
-  echo   [e] Kadro    : HENUZ uretilmedi
+  echo   [e] Kadro Onerisi      : %C_YELLOW%[HENUZ URETILMEDI]%C_RESET%
 )
 echo.
-echo --- Oneri ---
-set "onerilen=a"
-if exist "web_research_gw!GWeek!.json" set "onerilen=b"
-if exist "web_research_gw!GWeek!.json" if exist "fiyat_gw!GWeek!.json" set "onerilen=c"
-if exist "web_research_gw!GWeek!.json" if exist "fiyat_gw!GWeek!.json" if exist "nostradamus_fixtures_gw!GWeek!.json" set "onerilen=d"
-if exist "gw!GWeek!_kadro_onerisi.xlsx" set "onerilen=f"
-echo   Bundan sonra [!onerilen!] adimina gecmelisin.
+echo %C_CYAN%==================================================================%C_RESET%
+pause
+goto yeni_hafta
+
+:adim_2x
+cls
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1x] HIZLI MOD (EXPRESS PIPELINE) - Hafta !GWeek!%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
+echo.
+echo %C_YELLOW%Mevcut JSON dosyalari isleniyor ve kadro olusturuluyor...%C_RESET%
+echo.
+python quick_pipeline.py --excel "%EXCEL%" --gameweek !GWeek! --apply
 echo.
 pause
 goto yeni_hafta
 
-REM ============================================================
-REM [2a] SAKATLIK/CEZA VERISI
-REM ============================================================
 :adim_2a
 cls
-echo ==================================================================
-echo   ADIM 2a - SAKATLIK/CEZA VERISI TOPLA
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1a] SAKATLIK VE CEZA VERISI TOPLA (Hafta !GWeek!)%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Bu adimda bu hafta oynamayacak/sakat/cezali oyunculari tespit
-echo edecegiz. Kaynak: tff.org (cezalar) + fotmob + spor basini (sakatlik).
+echo %C_YELLOW%1. 462 oyuncu ve 18 kulup kadrosuyla prompt hazirlaniyor...%C_RESET%
+python generate_injury_prompt.py --gameweek !GWeek! --excel "%EXCEL%"
 echo.
-echo ADIM 1: web_arastirma_prompti.md dosyasini aciyorum...
-echo   (Notepad ile acilacak. Icindeki promptu kopyala.)
-echo.
-pause
+echo %C_GREEN%2. web_arastirma_prompti.md aciliyor. Metni AI'a yapistirin.%C_RESET%
 start notepad "web_arastirma_prompti.md"
 echo.
-echo ADIM 2: Promptu bir web AI'ya yapistir (Gemini, ChatGPT, Claude web).
-echo   AI'a soyle de:
-echo     "Turkiye Trendyol Super Lig icin hafta %GWeek% oncesi
-echo      sakatlik, cezali durum ve muhtemel 11 durumunu arastir."
-echo.
-echo ADIM 3: AI sana JSON formatinda cevap verecek. Su dosya adıyla
-echo   kaydet (ayni klasore, rehber.bat'in yanina):
-echo.
-echo   web_research_gw%GWeek%.json
-echo.
-echo ADIM 4: Kaydettin mi?
-set /p kaydetti="Dosyayi kaydettin mi? (e/h): "
-if /i not "!kaydetti!"=="e" (
-  echo.
-  echo Tamam, bu adimi simdilik atladin. Istedigin zaman [2] ^> [a]'ya
-  echo geri donup tamamlayabilirsin.
-  pause
-  goto yeni_hafta
-)
-if not exist "web_research_gw!GWeek!.json" (
-  echo.
-  echo [HATA] Dosya bulunamadi: web_research_gw!GWeek!.json
-  echo   Dosyayi dogru klasore kaydettiginden emin ol.
-  echo   Klasor: %CD%
-  pause
-  goto yeni_hafta
-)
-echo.
-echo [TAMAM] web_research_gw!GWeek!.json hazir.
-echo   Siradaki adim: [b] Fiyat verisi topla
+echo 3. AI'dan gelen JSON yanitini su isimle bu klasore kaydedin:
+echo    %C_BOLD%%C_CYAN%web_research_gw!GWeek!.json%C_RESET%
 echo.
 pause
-goto adim_2b
+goto yeni_hafta
 
-REM ============================================================
-REM [2b] FIYAT VERISI
-REM ============================================================
 :adim_2b
 cls
-echo ==================================================================
-echo   ADIM 2b - FIYAT VERISI TOPLA
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1b] GUNCEL FIYAT VERISINI TOPLA (Hafta !GWeek!)%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo TFF Fantezi Lig'de oyuncu fiyatlari oyunun KENDI ic ekonomisi -
-echo baska hicbir yerde yayinlanmiyor. Bu yuzden TFF uygulamasindan
-echo ekran goruntusu alip AI'a cevirecegiz.
+echo   %C_BOLD%%C_GREEN%[1] TARAYICI KONSOLU ILE 1-TIKLA INDIR (tff_fantezi_export.js)%C_RESET%
+echo   %C_WHITE%[2] AI Promptu ile Topla (fiyat_guncelleme_prompti.md)%C_RESET%
+echo   %C_RED%[0] Geri Don%C_RESET%
 echo.
-echo ADIM 1: TFF Fantezi Lig uygulamasini ac (telefonda veya web).
-echo   - Web: https://tfffantezilig.com/kadro-secimi
-echo   - "Transferler" veya "Piyasa" ekranina git.
-echo   - Kadrosundaki oyuncularin guncel fiyat listesini bul.
-echo.
-echo ADIM 2: Ekran goruntusu al. (Tum kadroyu goremiyorsan birden
-echo   fazla ekran goruntusu alabilirsin.)
-echo.
-echo ADIM 3: fiyat_guncelleme_prompti.md dosyasini aciyorum...
-echo   (Notepad ile acilacak. Icindeki promptu kopyala.)
-echo.
-pause
-start notepad "fiyat_guncelleme_prompti.md"
-echo.
-echo ADIM 4: Bir AI'a git (Gemini - ekran goruntusu okuyabiliyor).
-echo   - Promptu yapistir
-echo   - Ekran goruntusu/lerini yukle
-echo   - AI sana JSON formatinda fiyat listesi verecek
-echo.
-echo ADIM 5: JSON'i su dosya adıyla kaydet:
-echo   fiyat_gw%GWeek%.json
-echo.
-echo ADIM 6: Kaydettin mi?
-set /p kaydetti="Dosyayi kaydettin mi? (e/h): "
-if /i not "!kaydetti!"=="e" (
-  echo.
-  echo Tamam, fiyat guncellemesini atladin. Daha sonra tamamlayabilirsin.
-  echo   Not: Fiyat guncellenmezse sistem gecmis haftanin fiyatiyla
-  echo   kadro kurmaya calisir. Cok farkliysa kadro baskalasabilir.
-  pause
-  goto yeni_hafta
-)
-if not exist "fiyat_gw!GWeek!.json" (
-  echo.
-  echo [HATA] Dosya bulunamadi: fiyat_gw!GWeek!.json
-  echo   Klasor: %CD%
-  pause
-  goto yeni_hafta
-)
-echo.
-echo [TAMAM] fiyat_gw!GWeek!.json hazir.
-echo   Siradaki adim: [c] Nostradamus oranlari topla
-echo.
-pause
-goto adim_2c
+set /p fsecim="%C_BOLD%%C_YELLOW%Secim [0-2]: %C_RESET%"
 
-REM ============================================================
-REM [2c] NOSTRADAMUS ORANLARI
-REM ============================================================
+if "!fsecim!"=="1" (
+  start notepad "tff_fantezi_export.js"
+  echo %C_GREEN%tff_fantezi_export.js acildi.%C_RESET%
+  echo tfffantezilig.com sitesinde F12 Console'a yapistirip "Fiyatlari Indir"e basin.
+  pause
+  goto yeni_hafta
+)
+if "!fsecim!"=="2" (
+  start notepad "fiyat_guncelleme_prompti.md"
+  pause
+  goto yeni_hafta
+)
+goto yeni_hafta
+
 :adim_2c
 cls
-echo ==================================================================
-echo   ADIM 2c - NOSTRADAMUS ORANLARI TOPLA
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1c] NOSTRADAMUS ORANLARI TOPLA (Hafta !GWeek!)%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Nostradamus = TFF Fantezi Lig'in 9 mac tahmin oyunu. Her hafta
-echo 9 mac icin 1/X/2 tahmini yaparsin. Sistem bahis oranlarindan
-echo en olasi sonucu hesapliyor.
+echo   %C_BOLD%%C_GREEN%[1] TARAYICI KONSOLU ILE INDIR (oddsportal_export.js)%C_RESET%
+echo   %C_WHITE%[2] WEB AI ORAN TOPLAMA PROMPTU (nostradamus_oran_prompti.md)%C_RESET%
+echo   %C_YELLOW%[3] Dosyayi Notepad ile Duzenle (nostradamus_fixtures_gw!GWeek!.json)%C_RESET%
+echo   %C_RED%[0] Geri Don%C_RESET%
 echo.
-echo ADIM 1: Bu haftanin 9 macini bul.
-echo   - TFF Fantezi Lig uygulamasinda "Nostradamus" sekmesi
-echo   - VEYA tfffantezilig.com fikstur sayfasi
-echo.
-echo ADIM 2: Her mac icin 1X2 kapanis oranlarini topla.
-echo   Kaynak: oddsportal.com veya flashscore.com
-echo   - B365 (Bet365) ve PS (Pinnacle) kapanis oranlarini al
-echo   - Sadece tek kaynak bulabiliyorsan da olur (B365 yeterli)
-echo.
-echo ADIM 3: nostradamus_fixtures_gw%GWeek%.json dosyasini hazirla.
-if exist "nostradamus_fixtures_gw!GWeek!.json" (
-  echo   (Dosya zaten var, notepad'te aciyorum - uzerine yazabilirsin)
-) else (
-  echo   (Yeni dosya olusturuyorum, icine ornek sablon koyuyorum)
-  call :sablon_olustur "nostradamus_fixtures_gw!GWeek!.json"
-)
-echo.
-pause
-start notepad "nostradamus_fixtures_gw!GWeek!.json"
-echo.
-echo ADIM 4: Dosyayi kaydettin mi?
-set /p kaydetti="Dosyayi kaydettin mi? (e/h): "
-if /i not "!kaydetti!"=="e" (
-  echo.
-  echo Tamam, Nostradamus adimini atladin.
-  echo   UYARI: Nostradamus tahmin olmadan o hafta +10 puan firsati kacar.
+set /p osecim="%C_BOLD%%C_YELLOW%Secim [0-3]: %C_RESET%"
+
+if "!osecim!"=="1" (
+  start notepad "oddsportal_export.js"
   pause
   goto yeni_hafta
 )
-echo.
-echo [TAMAM] nostradamus_fixtures_gw!GWeek!.json hazir.
-echo   Siradaki adim: [d] Sisteme yukle
-echo.
-pause
-goto adim_2d
+if "!osecim!"=="2" (
+  start notepad "nostradamus_oran_prompti.md"
+  pause
+  goto yeni_hafta
+)
+if "!osecim!"=="3" (
+  start notepad "nostradamus_fixtures_gw!GWeek!.json"
+  pause
+  goto yeni_hafta
+)
+goto yeni_hafta
 
-REM ============================================================
-REM [2d] SISTEME YUKLE
-REM ============================================================
 :adim_2d
 cls
-echo ==================================================================
-echo   ADIM 2d - SISTEME YUKLE (3 JSON'i isle)
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1d] SISTEME YUKLE (JSON Dosyalarini Excel'e Isle)%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Bu adimda hazirladigin 3 JSON dosyasini sisteme isleyecegiz.
-echo Her biri once DRY-RUN (kontrol), sonra onay ile UYGULA.
-echo.
-
-REM --- 2d.1 Sakatlik ---
-echo --- 2d.1 SAKATLIK YUKLEME ---
-if not exist "web_research_gw!GWeek!.json" (
-  echo   [ATLANDI] web_research_gw!GWeek!.json bulunamadi.
-  echo   [2] ^> [a] adimina geri donup olustur.
-) else (
-  echo   Dry-run calistiriliyor...
-  echo.
-  python update_from_web_research.py "%EXCEL%" "web_research_gw!GWeek!.json"
-  echo.
-  echo   Yukaridaki raporu oku. Isim eslesmeyenler veya reddedilenler
-  echo   varsa once JSON'i duzeltip tekrar dry-run yap.
-  echo.
-  set /p onay="Uygula? (e/h): "
-  if /i "!onay!"=="e" (
-    python update_from_web_research.py "%EXCEL%" "web_research_gw!GWeek!.json" --apply
-    echo   [TAMAM] Sakatlik verisi islendi.
-  ) else (
-    echo   [ATLANDI] Sakatlik uygulanmadi.
-  )
+if exist "web_research_gw!GWeek!.json" (
+  python update_from_web_research.py "%EXCEL%" "web_research_gw!GWeek!.json" --apply
 )
-echo.
-pause
-
-REM --- 2d.2 Fiyat ---
-cls
-echo ==================================================================
-echo   ADIM 2d - SISTEME YUKLE (devam)
-echo ==================================================================
-echo.
-echo --- 2d.2 FIYAT YUKLEME ---
-if not exist "fiyat_gw!GWeek!.json" (
-  echo   [ATLANDI] fiyat_gw!GWeek!.json bulunamadi.
-  echo   [2] ^> [b] adimina geri donup olustur.
-) else (
-  echo   Dry-run calistiriliyor...
-  echo.
-  python ingest_price_updates.py "%EXCEL%" "fiyat_gw!GWeek!.json"
-  echo.
-  set /p onay="Uygula? (e/h): "
-  if /i "!onay!"=="e" (
-    python ingest_price_updates.py "%EXCEL%" "fiyat_gw!GWeek!.json" --apply
-    echo   [TAMAM] Fiyat verisi islendi.
-  ) else (
-    echo   [ATLANDI] Fiyat uygulanmadi.
-  )
+if exist "fiyat_gw!GWeek!.json" (
+  python ingest_price_updates.py "%EXCEL%" "fiyat_gw!GWeek!.json" --apply
 )
-echo.
-pause
-
-REM --- 2d.3 Nostradamus tahmin ---
-cls
-echo ==================================================================
-echo   ADIM 2d - SISTEME YUKLE (devam)
-echo ==================================================================
-echo.
-echo --- 2d.3 NOSTRADAMUS TAHMINI URET ---
-if not exist "nostradamus_fixtures_gw!GWeek!.json" (
-  echo   [ATLANDI] nostradamus_fixtures_gw!GWeek!.json bulunamadi.
-  echo   [2] ^> [c] adimina geri donup olustur.
-) else (
-  echo   Tahmin uretiliyor...
-  echo.
+if exist "nostradamus_fixtures_gw!GWeek!.json" (
   python nostradamus_predict.py "nostradamus_fixtures_gw!GWeek!.json"
-  echo.
-  echo   [TAMAM] Tahminler nostradamus_predict_gw!GWeek!.json olarak kaydedildi.
-  echo   Bu dosyayi [2f] adiminda TFF'ye elle girerken kullanacaksin.
 )
 echo.
 pause
-goto adim_2e
+goto yeni_hafta
 
-REM ============================================================
-REM [2e] KADRO OPTIMIZASYONU
-REM ============================================================
 :adim_2e
 cls
-echo ==================================================================
-echo   ADIM 2e - KADRO OPTIMIZASYONU
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1e] KADRO OPTIMIZASYONU - Hafta !GWeek!%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Simdi sistem verileri kullanarak en iyi 15 oyuncuyu secer.
-echo Cikti: gw%GWeek%_kadro_onerisi.xlsx
-echo.
-echo   - 2 Kaleci, 5 Defans, 5 Orta Saha, 3 Forvet
-echo   - Toplam 100M TL budget
-echo   - Ayni takimdan max 3 oyuncu
-echo   - Kaptan ve yedek kaptan otomatik secilir
-echo   - Yedek sirasi otomatik belirlenir
-echo.
-pause
-echo Calistiriliyor...
-echo.
-python run_gameweek.py "%EXCEL%" --gameweek %GWeek%
+python run_gameweek.py "%EXCEL%" --gameweek !GWeek!
 echo.
 if exist "gw!GWeek!_kadro_onerisi.xlsx" (
-  echo [TAMAM] Kadro onerisi hazir: gw!GWeek!_kadro_onerisi.xlsx
-  echo   Dosyayi otomatik aciyorum...
   start "" "gw!GWeek!_kadro_onerisi.xlsx"
-  echo.
-  echo   Excel acildi. Sari satir = KAPTAN, acik sari = YEDEK KAPTAN,
-  echo   gri satir = BENCH. Satirlar pozisyona gore sirali (GK ^> DEF ^> MID ^> FWD).
-  echo.
-  echo Siradaki adim: [f] TFF'ye elle gir
-) else (
-  echo [HATA] Kadro dosyasi olusturulamadi. Yukaridaki hata mesajini oku.
 )
 echo.
 pause
-goto adim_2f
+goto yeni_hafta
 
-REM ============================================================
-REM [2f] TFF'YE ELLE GIR
-REM ============================================================
 :adim_2f
 cls
-echo ==================================================================
-echo   ADIM 2f - TFF'YE ELLE GIR
-echo ==================================================================
+echo %C_GREEN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [1f] TFF'YE ELLE GIRIS REHBERI%C_RESET%
+echo %C_GREEN%==================================================================%C_RESET%
 echo.
-echo Sistem kadroyu hazirladi, ama TFF'ye SEN gireceksin. Otomatik
-echo gonderim yok (oyun API vermiyor).
-echo.
-echo Bu adimi sirayla yap:
-echo.
-echo   1. TFF Fantezi Lig uygulamasini ac
-echo      Web: https://tfffantezilig.com/kadro-secimi
-echo.
-echo   2. KADRO SECIMI - 15 oyuncu sec:
-echo      - gw%GWeek%_kadro_onerisi.xlsx dosyasini ac
-echo      - "STARTER" ve "BENCH" etiketlerine bak
-echo      - Once mevcut kadrodan CIKACAK oyunculari cikar
-echo      - Sonra EKLENECEK oyunculari ekle
-echo      - 100M TL budget'i asma
-echo.
-echo   3. ILK 11 - formasyonu yerlestir:
-echo      - "STARTER" etiketli 11 oyuncu ilk 11'de olmali
-echo      - Min 1 Kaleci, min 3 Defans, min 1 Forvet
-echo.
-echo   4. KAPTAN:
-echo      - role=CAPTAN olan oyuncuyu kaptan yap (puan 2x)
-echo      - role=VICE_CAPTAIN olan oyuncuyu yedek kaptan yap
-echo.
-echo   5. YEDEK SIRASI:
-echo      - Bench oyuncularini oncelik sirasina gore diz
-echo      - Excel'deki siraya uy (bench_gk once, sonra 1-2-3)
-echo.
-echo   6. NOSTRADAMUS:
-echo      - "Nostradamus" sekmesine git
-echo      - 9 mac icin nostradamus_predict_gw%GWeek%.json'daki
-echo        "prediction" alanini kullan (1/X/2)
-echo      - 9 macin TAMAMINI doldur (+1 puan)
-echo.
-echo   7. MENAJER KARTI (opsiyonel):
-echo      - Deadline'dan en az 15 dk ONCE satin al
-echo      - Son 15 dk'da alinamiyor (oyun kurali)
-echo.
-echo --- ONEMLI ZAMAN KISITI ---
-echo   Deadline = haftanin ilk macindan 1 saat once.
-echo   Bu saatten sonra kadro/transfer/kaptan DEGISTIRILEMEZ.
-echo   Saatini kontrol et, erken gir.
-echo.
-echo ==================================================================
-echo   Tum adimlari uyguladin mi?
-echo ==================================================================
-set /p bitti="TFF'ye kadroyu girdin mi? (e/h): "
-if /i "!bitti!"=="e" (
-  echo.
-  echo [BASARILI] Hafta %GWeek% hazirligi tamam!
-  echo   Maclar oynandiktan sonra [3] MAQLAR BITTI adimina gel.
-  echo   Orada gerçek sonuçları sisteme yükleyecegiz.
-  echo.
-  set /a nextWeek=GWeek+1
-  echo   Not: Bir sonraki hafta hazirligina baslamak istersen
-  echo   ana menude GWeek'i !nextWeek! olarak guncelle.
-)
+echo   1. https://tfffantezilig.com/kadro-secimi adresine gidin.
+echo   2. gw!GWeek!_kadro_onerisi.xlsx dosyasindaki 15 oyuncuyu secin.
+echo   3. KAPTAN (2x) ve YEDEK KAPTAN secimlerini Excel'e gore ayarlayin.
+echo   4. Yedek oyuncularin siralama onceligini Excel'deki sirayla dizin.
+echo   5. Nostradamus tahminlerini nostradamus_predict_gw!GWeek!.json dosyasindan girin.
 echo.
 pause
-goto ana_menu
+goto yeni_hafta
+
 
 REM ============================================================
-REM [3] MAQLAR BITTI - SONUQLARI GIR
+REM [2] GECEN HAFTANIN VERILERINI ISLE (MACLAR SONRASI)
 REM ============================================================
 :maclar_bitti
 cls
-echo ==================================================================
-echo   [3] MAQLAR BITTI - SONUQLARI GIR (Hafta %GWeek%)
-echo ==================================================================
+echo %C_BLUE%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [2] GECEN HAFTANIN VERILERINI ISLE (Hafta Sonuclari)%C_RESET%
+echo %C_BLUE%==================================================================%C_RESET%
 echo.
-echo Bu adim haftanin maclari bitince yapilir. Gercek performans
-echo verisini (dakika, gol, asist, kart, puan) sisteme yukleriz.
-echo Bu veri BIR SONRAKI haftanin kadro optimizasyonunu iyilestirir.
+echo   %C_BOLD%%C_GREEN%[1] Mac Sonuclarini ve Puanlari Sisteme Isle (match_sonuclari_gw!GWeek!.json)%C_RESET%
+echo       %C_GRAY%GameweekLog, Fixtures skorlari ve SeasonStats liderlik tablosunu gunceller.%C_RESET%
 echo.
+echo   %C_CYAN%[2] Fiksturden 9 Maci 1-Tikla Cek (tff_fantezi_export.js)%C_RESET%
+echo   %C_WHITE%[3] Sezonluk Liderlik Tablosunu Ekranda Gor (SeasonStats)%C_RESET%
+echo   %C_RED%[9] Ana Menuye Don%C_RESET%
+echo %C_BLUE%==================================================================%C_RESET%
+set /p msecim="%C_BOLD%%C_YELLOW%Seciminiz [1-3, 9]: %C_RESET%"
 
-REM --- 3a: Sonuç JSON'u oluştur ---
-echo --- 3a: MAC SONUQLARINI JSON'A CEVIR ---
-echo.
-echo ADIM 1: TFF Fantezi Lig uygulamasinda "Puanim" ekranina git.
-echo   - Bu ekran haftanin tum oyuncularinin gercek puanini gosterir
-echo   - Ekran goruntusu al
-echo.
-echo ADIM 2: match_sonuclari_prompti.md dosyasini aciyorum...
-pause
-start notepad "match_sonuclari_prompti.md"
-echo.
-echo ADIM 3: Gemini (goruntu okuyabilen AI) git.
-echo   - Promptu yapistir
-echo   - Ekran goruntusunu yukle
-echo   - AI sana JSON verecek
-echo.
-echo ADIM 4: JSON'i su dosya adıyla kaydet:
-echo   match_sonuclari_gw%GWeek%.json
-echo.
-echo ADIM 5: Kaydettin mi?
-set /p kaydetti="Dosyayi kaydettin mi? (e/h): "
-if /i not "!kaydetti!"=="e" (
-  echo.
-  echo Tamam, bu adimi atladin. Maclar bittiginde tekrar gel.
+if "!msecim!"=="1" goto isle_sonuclar
+if "!msecim!"=="2" (
+  start notepad "tff_fantezi_export.js"
+  echo %C_GREEN%tff_fantezi_export.js acildi.%C_RESET%
+  echo tfffantezilig.com sitesinde F12 Console'a yapistirip "9 Macin Resmi Istatistiklerini Indir"e basin.
   pause
-  goto ana_menu
+  goto maclar_bitti
 )
-if not exist "match_sonuclari_gw!GWeek!.json" (
-  echo [HATA] match_sonuclari_gw!GWeek!.json bulunamadi.
-  pause
-  goto ana_menu
-)
-echo.
-echo [TAMAM] match_sonuclari_gw!GWeek!.json hazir.
-echo.
+if "!msecim!"=="3" goto goruntule_liderlik
+if "!msecim!"=="9" goto ana_menu
+goto maclar_bitti
 
-REM --- 3b: Sisteme yükle ---
-echo --- 3b: SONUQLARI SISTEME YUKLE ---
-echo.
-echo Dry-run calistiriliyor...
-echo.
-python ingest_gameweek_results.py "%EXCEL%" "match_sonuclari_gw!GWeek!.json"
-echo.
-echo Raporu oku. Isim eslesmeyenler varsa once JSON'i duzelt.
-echo.
-set /p onay="Uygula? (e/h): "
-if /i "!onay!"=="e" (
-  python ingest_gameweek_results.py "%EXCEL%" "match_sonuclari_gw!GWeek!.json" --apply
-  echo.
-  echo [TAMAM] Hafta %GWeek% sonuclari sisteme islendi.
-  echo.
-  echo Bu veri bir sonraki haftanin kadro optimizasyonu icin kullanilacak.
-  echo   - xp_model.py gercek performans ile prior kalibrasyonu yapar
-  echo   - Birikme adimindan sonra (5-6 hafta) kadro onerileri daha iyi
-  echo.
-  set /a nextWeek=GWeek+1
-  echo BIR SONRAKI HAFTA: GWeek'i !nextWeek! olarak guncelle ve
-  echo [2] YENI HAFTA HAZIRLIGI'na basla.
-) else (
-  echo [ATLANDI] Sonuclar uygulanmadi.
-)
-echo.
-pause
-goto ana_menu
-
-REM ============================================================
-REM [4] TRANSFER PENCERESI
-REM ============================================================
-:transfer_penceresi
+:isle_sonuclar
 cls
-echo ==================================================================
-echo   [4] TRANSFER PENCERESI (Sezon Ortasi)
-echo ==================================================================
+echo %C_BLUE%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  MAC SONUCLARI VE OYUNCU PUANLARI ISLENIYOR...%C_RESET%
+echo %C_BLUE%==================================================================%C_RESET%
 echo.
-echo BU ADIM SADECE 17. HAFTADAN SONRA KULLANILIR.
-echo Sezon ortasi transfer penceresi (genelde Ocak basi) acildiginda
-echo yeni gelen/giden/transfer olan oyunculari sisteme isle.
-echo.
-if !GWeek! LSS 17 (
-  echo [UYARI] Su anki hafta %GWeek%. Transfer penceresi 17. haftadan
-  echo   once kullanilmaz. Eger emin degilsen [5] SISTEM DURUMU'na bak.
-  echo.
-  set /p yine_de="Yine de devam et? (e/h): "
-  if /i not "!yine_de!"=="e" goto ana_menu
-)
-echo.
-echo ADIM 1: transfer_prompti.md dosyasini aciyorum...
-pause
-start notepad "transfer_prompti.md"
-echo.
-echo ADIM 2: Bir web AI'ya git (Gemini, ChatGPT).
-echo   - Promptu yapistir
-echo   - "Transfermarkt'tan son transferleri ara" de
-echo   - AI sana JSON formatinda transfer listesi verecek
-echo.
-echo ADIM 3: JSON'i su dosya adıyla kaydet:
-echo   transfer_pencere_YYYYMMDD.json  (YYYYMMDD = bugunun tarihi)
-echo.
-echo ADIM 4: Kaydettin mi?
-set /p kaydetti="Dosyayi kaydettin mi? (e/h): "
-if /i not "!kaydetti!"=="e" (
-  pause
-  goto ana_menu
-)
-echo.
-echo --- Transfer dosyasini sec ---
-echo Olusturdugun JSON dosyasinin adini tam yaz:
-set /p tr_json="Dosya adi (ornek: transfer_pencere_20260115.json): "
-if "!tr_json!"=="" (
-  echo [HATA] Bos birakilamaz.
-  pause
-  goto ana_menu
-)
-if not exist "!tr_json!" (
-  echo [HATA] Dosya bulunamadi: !tr_json!
-  echo   Klasor: %CD%
-  pause
-  goto ana_menu
-)
-echo.
-echo Dry-run calistiriliyor...
-echo.
-python ingest_transfer_window.py "%EXCEL%" "!tr_json!"
-echo.
-echo Raporu oku:
-echo   - "in" : yeni oyuncu (yeni player_id atanir)
-echo   - "out": pasiflestirilir (satir silinmez, is_active=0)
-echo   - "move": takimi guncellenir
-echo.
-set /p onay="Uygula? (e/h): "
-if /i "!onay!"=="e" (
-  python ingest_transfer_window.py "%EXCEL%" "!tr_json!" --apply
-  echo.
-  echo [TAMAM] Transferler islendi.
-  echo   Yeni oyuncular bir sonraki kadro optimizasyonunda secilebilir.
-) else (
-  echo [ATLANDI] Transferler uygulanmadi.
-)
-echo.
-pause
-goto ana_menu
-
-REM ============================================================
-REM [5] SISTEM DURUMU
-REM ============================================================
-:sistem_durumu
-cls
-echo ==================================================================
-echo   [5] SISTEM DURUMU
-echo ==================================================================
-echo.
-echo --- MEVCUT DOSYALAR ---
-echo Excel: %EXCEL% 
-if exist "%EXCEL%" (
-  echo   [OK] Bulundu
-) else (
-  echo   [EKSIK] Bulunamadi!
-)
-echo.
-echo --- GW %GWeek% ICIN HAZIRLIK ---
-if exist "web_research_gw!GWeek!.json" (
-  echo   [a] Sakatlik       : HAZIR
-) else (
-  echo   [a] Sakatlik       : EKSIK
-)
-if exist "fiyat_gw!GWeek!.json" (
-  echo   [b] Fiyat          : HAZIR
-) else (
-  echo   [b] Fiyat          : EKSIK
-)
-if exist "nostradamus_fixtures_gw!GWeek!.json" (
-  echo   [c] Oranlar        : HAZIR
-) else (
-  echo   [c] Oranlar        : EKSIK
-)
-if exist "nostradamus_predict_gw!GWeek!.json" (
-  echo   Nostradamus tahmin : HAZIR
-) else (
-  echo   Nostradamus tahmin : HENUZ uretilmedi
-)
-if exist "gw!GWeek!_kadro_onerisi.xlsx" (
-  echo   [e] Kadro          : HAZIR
-) else (
-  echo   [e] Kadro          : HENUZ uretilmedi
-)
 if exist "match_sonuclari_gw!GWeek!.json" (
-  echo   [3] Sonuclar       : HAZIR
+  python ingest_gameweek_results.py "%EXCEL%" "match_sonuclari_gw!GWeek!.json" --apply
 ) else (
-  echo   [3] Sonuclar       : HENUZ girilmedi
-)
-echo.
-echo --- TAVSIYE ---
-echo.
-echo Su an %GWeek%. haftasinin hazirligindasin.
-echo.
-if not exist "match_sonuclari_gw!GWeek!.json" if exist "gw!GWeek!_kadro_onerisi.xlsx" (
-  echo Maclar henuz oynanmadi veya sonuclar girilmedi.
-  echo   - Maclar bitince [3]'e gel.
-  echo   - Yeni haftaya gecmek istersen: GWeek'i bir artir.
-)
-if not exist "gw!GWeek!_kadro_onerisi.xlsx" (
-  echo Kadro henuz uretilmedi.
-  echo   [2] YENI HAFTA HAZIRLIGI'na girip adimlari takip et.
+  echo %C_RED%[HATA] match_sonuclari_gw!GWeek!.json bulunamadi!%C_RESET%
 )
 echo.
 pause
-goto ana_menu
+goto maclar_bitti
 
-REM ============================================================
-REM [6] BACKTEST
-REM ============================================================
-:backtest
+:goruntule_liderlik
 cls
-echo ==================================================================
-echo   [6] BACKTEST - Sistem Saglik Kontrolu
-echo ==================================================================
+echo %C_CYAN%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  TOP 15 SEZONLUK LIDERLIK TABLOSU (SeasonStats)%C_RESET%
+echo %C_CYAN%==================================================================%C_RESET%
 echo.
-echo Bu adim sistemimin gecmis sezonlarda ne kadar iyi tahmin
-echo yaptigini olcer. Ayda bir calistirmak yeterli.
+python -c "
+import openpyxl, pandas as pd
+wb = openpyxl.load_workbook('oyuncu_veritabani.xlsx', data_only=True)
+if 'SeasonStats' in wb.sheetnames:
+    ws = wb['SeasonStats']
+    data = list(ws.iter_rows(values_only=True))[3:]
+    df = pd.DataFrame(data[1:], columns=data[0])
+    print(df.head(15)[['name', 'team', 'position_code', 'total_minutes', 'total_points', 'points_per_90', 'total_goals', 'total_assists', 'form_score']].to_string())
+else:
+    print('SeasonStats sayfasi bulunamadi.')
+"
 echo.
-echo Bakmasi gerekenler:
-echo   - Brier skoru 0.55 civarindaysa: SISTEM SAGLIKLI
-echo   - Brier 0.60 uzerindense: Bir seyler degismis, not al
-echo   - Rastgele tahmin = 0.6667 (kötü)
-echo.
+echo %C_CYAN%==================================================================%C_RESET%
 pause
-if not exist "nostradamus\superlig_odds.db" (
-  echo [HATA] nostradamus\superlig_odds.db bulunamadi.
-  echo   Once su komutu calistir:
-  echo   python nostradamus\build_superlig_db.py ^<unified.db yolu^> nostradamus\superlig_odds.db
-  pause
-  goto ana_menu
+goto maclar_bitti
+
+
+REM ============================================================
+REM [3] SISTEM AYARLARI VE LIDERLIK TABLOSU
+REM ============================================================
+:ayarlar_menu
+cls
+echo %C_MAGENTA%==================================================================%C_RESET%
+echo %C_BOLD%%C_WHITE%  [3] SISTEM AYARLARI VE ARACLAR%C_RESET%
+echo %C_MAGENTA%==================================================================%C_RESET%
+echo.
+echo   [1] Aktif Hafta Numarasini Degistir %C_GRAY%(Su an: !GWeek!)%C_RESET%
+echo   [2] Ana Excel Veritabanini Ac %C_GRAY%(oyuncu_veritabani.xlsx)%C_RESET%
+echo   [3] Sezonluk Liderlik Tablosunu Gor %C_GRAY%(SeasonStats)%C_RESET%
+echo   [4] En Son Uretilen Kadro Onerisini Ac %C_GRAY%(gw!GWeek!_kadro_onerisi.xlsx)%C_RESET%
+echo   [5] Gecmis Yedekleri Gor %C_GRAY%(backups/ klasoru)%C_RESET%
+echo   [9] Ana Menuye Don
+echo %C_MAGENTA%==================================================================%C_RESET%
+set /p asecim="%C_BOLD%%C_YELLOW%Secim [1-5, 9]: %C_RESET%"
+
+if "!asecim!"=="1" (
+  set /p GWeek="Yeni Hafta Numarasi [1-38]: "
+  goto ayarlar_menu
 )
-echo Calistiriliyor...
-echo.
-python nostradamus\backtest_devig_baseline.py nostradamus\superlig_odds.db --seasons 3
-echo.
-echo Yukaridaki ciktiyi oku. Brier skoru "TOPLAM" satirinda.
-echo Sonucu docs\07_GELISTIRME_GUNLUGU.md'ye not et (her seferinde).
-echo.
-pause
-goto ana_menu
+if "!asecim!"=="2" (
+  start "" "%EXCEL%"
+  goto ayarlar_menu
+)
+if "!asecim!"=="3" (
+  goto goruntule_liderlik
+)
+if "!asecim!"=="4" (
+  if exist "gw!GWeek!_kadro_onerisi.xlsx" start "" "gw!GWeek!_kadro_onerisi.xlsx"
+  goto ayarlar_menu
+)
+if "!asecim!"=="5" (
+  explorer backups
+  goto ayarlar_menu
+)
+if "!asecim!"=="9" goto ana_menu
+goto ayarlar_menu
 
-REM ============================================================
-REM CIKIS
-REM ============================================================
 :cikis
-echo.
-echo Rehber modu kapatiliyor.
-echo   Unutma: Maclar bitince [3]'e gel.
-echo           Yeni haftaya gecince GWeek'i artir.
-echo.
-endlocal
+cls
+echo %C_GREEN%TFF Fantezi Lig Yonetim Merkezi kapatildi.%C_RESET%
 exit /b 0
-
-REM ============================================================
-REM ALT YORDAM: Nostradamus sablonu olustur
-REM ============================================================
-:sablon_olustur
-REM Parametre %1 = dosya adi
-(
-echo {
-echo   "gameweek": %GWeek%,
-echo   "prediction_date": "2026-MM-DD",
-echo   "fixtures": [
-echo     {
-echo       "home_team": "Ev Sahibi Takim",
-echo       "away_team": "Deplasman Takim",
-echo       "match_date": "2026-MM-DD",
-echo       "odds": {
-echo         "B365": {"H": 1.85, "D": 3.6, "A": 4.2},
-echo         "PS":  {"H": 1.88, "D": 3.55, "A": 4.25}
-echo       }
-echo     }
-echo   ]
-echo }
-) > "%~1"
-echo   Sablon olusturuldu: %~1
-echo   9 maci fixtures dizisine ekle (yukaridaki ornegi kopyala).
-goto :eof

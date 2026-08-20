@@ -54,7 +54,7 @@ from difflib import SequenceMatcher
 import openpyxl
 
 from validator import validate_transfer_window
-from backup_utils import backup_excel
+from backup_utils import backup_excel, safe_save_excel
 
 
 NAME_MATCH_THRESHOLD = 0.82
@@ -355,7 +355,7 @@ def main():
             ws.cell(row=new_row, column=headers["is_active"]).value = 1
             applied["add_new"] += 1
 
-    wb.save(args.excel_path)
+    safe_save_excel(wb, args.excel_path)
     print(f"\n[UYGULANDI] {applied['add_new']} yeni oyuncu eklendi, "
           f"{applied['deactivate']} oyuncu pasifleştirildi, "
           f"{applied['change_team']} oyuncunun takımı güncellendi. "

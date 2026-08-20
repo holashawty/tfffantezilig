@@ -1,86 +1,79 @@
-# Hafta-Sonu Mac Sonuclari Prompti (Faz 2)
+# Hafta-Sonu Maç Sonuçları ve Oyuncu Puanları Rehberi
 
-Bu, web_arastirma_prompti.md'den FARKLI bir adim: o hafta BASLAMADAN
-once (sakatlik/ceza), bu ise o hafta BITTIKTEN sonra (gercek
-performans) kullanilir.
+Bu aşama, maç haftası tamamlandıktan sonra gerçek performans verilerini (`GameweekLog`) sisteme işlemek için kullanılır.
 
-## KAYNAK ONCELIGI (onemli)
+> [!IMPORTANT]
+> **462 Oyuncunun Profiline Tek Tek Tıklamanıza Kesinlikle Gerek Yoktur!**
+> Aşağıdaki pratik yöntemlerden birini kullanarak tüm haftanın verilerini saniyeler veya dakikalar içinde toplayabilirsiniz.
 
-Puan, sari/kirmizi kart ve varsa fiyat verisi icin ONCE
-tfffantezilig.com (oyunun kendi resmi kaynagi) ve tff.org'un resmi
-Futbolcular/Statlar sayfalarina bak. Genel web aramasi (sofascore,
-goal.com vb.) sadece resmi kaynak eksik/erisilemezse kullanilmali.
+---
 
-## VERI KALITESI KONTROLU (henuz otomatik degil — TODO)
+## 🚀 YÖNTEM 1: Tarayıcıdan 1-Tıkla İndirme (En Hızlı & Sıfır Zahmet - ~1 Saniye)
 
-ingest_gameweek_results.py su an sadece isim eslesmesini kontrol
-ediyor. Eklenmesi gereken "kontrolcu" katmani:
-  - Beklenen mac sayisina gore oyuncu sayisi makul mu (asiri eksik
-    veri yok mu)?
-  - minutes/goals/assists gibi alanlar mantikli araliklarda mi
-    (ornegin goller negatif olamaz, dakika 0-90+uzatma disinda olamaz)?
-  - fantasy_points TFF'nin kendi kaynagindan mi (A yontemi) yoksa
-    tahmini mi (B yontemi) — hangisi oldugu isaretlenmeli.
-Bu kontrol gecmeden hicbir sonuc GameweekLog'a sessizce eklenmemeli.
+1. Tarayıcınızda [tfffantezilig.com](https://tfffantezilig.com) sitesini açın.
+2. Klavyeden `F12` tuşuna basın (veya sağ tık -> *İncele*), açılan pencerede **Console (Konsol)** sekmesine gelin.
+3. Proje klasöründeki `tff_fantezi_export.js` dosyasının içeriğini kopyalayıp konsola yapıştırın ve `Enter`'a basın.
+4. Ekranın sağ üst köşesinde beliren panelden **"⚽ Maç Sonuçlarını İndir"** butonuna tıklayın.
+5. İndirilen `match_sonuclari_gwX.json` dosyasını proje klasörüne kopyalayın.
 
-## FIYAT GUNCELLEMESI — HENUZ EKSIK (TODO)
+---
 
-price_tl alani JSON semasinda ve GameweekLog'da var, ama fiyatlarin
-haftalik nasil degistigini arastiracak ayri bir prompt/mekanizma
-HENUZ YAZILMADI. Fiyatlar tfffantezilig.com'un kendi arayuzunde
-gorunuyorsa, oraya ozel bir arastirma adimi eklenmeli.
+## 📸 YÖNTEM 2: Fikstür / Maç Özeti Ekranı (Toplu Ekran Görüntüsü - ~2 Dakika)
 
-## Tercih edilen yontem (A): TFF uygulamasindan dogrudan transkript
+Haftada 462 oyuncu yerine sadece **9 maç** oynanır.
+1. TFF Fantezi Lig uygulamasında **"Fikstür / Sonuçlar"** sekmesine gidin.
+2. Oynanan 9 maçın detayına tıklayarak sahaya çıkan oyuncuların ve puanların ekran görüntüsünü alın.
+3. Gemini'ye aşağıdaki prompt ile birlikte görselleri yükleyin:
 
-TFF Fantezi Lig'de "Puanim" ekranindaki haftalik oyuncu puanlarinin
-ekran goruntusunu al. Belge/gorsel yukleyebilen bir AI'ya (Gemini) su
-sekilde ver:
-
-------------------------------------------------------------------
-Bu ekran goruntusundeki TFF Fantezi Lig oyuncu haftalik puanlarini
-asagidaki JSON semasina donustur. SADECE JSON don, baska metin ekleme.
-Gorseldeki her satiri birebir aktar, sayilari uydurma:
+```text
+Bu ekran görüntülerindeki TFF Fantezi Lig maç sonuçlarını ve oyuncu puanlarını aşağıdaki JSON şemasına dönüştür. SADECE geçerli bir JSON döndür, açıklama ekleme:
 
 {
   "gameweek": [HAFTA NO],
   "results": [
     {
-      "player_name": "...", "team": "...",
-      "minutes": 0, "goals": 0, "assists": 0,
-      "yellow_cards": 0, "red_cards": 0,
-      "fantasy_points": 0.0
+      "player_name": "Oyuncu Adı",
+      "team": "Takım Adı",
+      "minutes": 90,
+      "goals": 0,
+      "assists": 0,
+      "yellow_cards": 0,
+      "red_cards": 0,
+      "fantasy_points": 6.0
     }
   ]
 }
-------------------------------------------------------------------
+```
+4. AI'ın ürettiği çıktıyı `match_sonuclari_gwX.json` olarak kaydedin.
 
-Bu en guvenilir kaynak: fantasy_points TFF'nin KENDI hesapladigi
-gercek deger, bizim tahminimize gerek yok.
+---
 
-## Tamamlayici yontem (B): web arastirmasiyla mac istatistikleri
+## 🌐 YÖNTEM 3: Web Araştırması (Harici İstatistikler)
 
-Eger (A) elde degilse veya PRIOR_CONFIG kalibrasyonu icin daha fazla
-oyuncunun ham istatistiklerine (dakika/gol/asist) ihtiyac varsa, web
-aramasi yapabilen bir AI'ya:
+Eğer TFF platformuna erişilemiyorsa, Gemini/ChatGPT'ye şu promptu verin:
 
-------------------------------------------------------------------
-Trendyol Super Lig [HAFTA NO]. hafta maclarinin sonuclarini ve oyuncu
-istatistiklerini (sofascore, goal.com, resmi kulup siteleri) arastir.
-SADECE gercekten bulabildigin oyuncular icin, asagidaki JSON semasina
-gore cevap ver (fantasy_points alanini biliyorsan doldur, bilmiyorsan
-null birak, UYDURMA):
+```text
+Türkiye Trendyol Süper Lig [HAFTA NO]. hafta maçlarının sonuçlarını, oynayan oyuncuları, dakika, gol, asist ve kart istatistiklerini araştır. Sonuçları aşağıdaki JSON şemasına dönüştür:
 
 {
   "gameweek": [HAFTA NO],
   "results": [
-    {"player_name": "...", "team": "...", "minutes": 0, "goals": 0,
-     "assists": 0, "yellow_cards": 0, "red_cards": 0,
-     "fantasy_points": null}
+    {
+      "player_name": "...",
+      "team": "...",
+      "minutes": 90,
+      "goals": 0,
+      "assists": 0,
+      "yellow_cards": 0,
+      "red_cards": 0,
+      "fantasy_points": null
+    }
   ]
 }
-------------------------------------------------------------------
+```
 
-Cikan JSON'u `sonuclar_gwN.json` olarak kaydet, sonra:
+---
 
-    python ingest_gameweek_results.py oyuncu_veritabani_guncel.xlsx sonuclar_gwN.json
-    (rapor iyiyse) --apply ile tekrar calistir
+## Sisteme Yükleme
+
+Dosyayı oluşturduktan sonra `rehber.bat` menüsünden **[3] MAÇLAR BİTTİ** -> **[1] Sonuçları Tek Tıkla Sisteme İşle** seçeneğini seçin.

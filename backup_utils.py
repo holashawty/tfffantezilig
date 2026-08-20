@@ -64,3 +64,19 @@ def backup_excel(excel_path: str) -> str:
         print(f"[UYARI] Yedek alinamadi: {e}")
         print(f"        Devam etmek riskli — Excel'e yazmadan once kontrol et.")
         return ""
+
+
+def safe_save_excel(wb, excel_path: str):
+    """Excel dosyasini kaydeder. Eger dosya baska bir programda aciksa
+    ve PermissionError verirse kullaniciya kapatmasi icin bekleme firsati tanir."""
+    while True:
+        try:
+            wb.save(excel_path)
+            break
+        except PermissionError:
+            print(f"\n[UYARI] '{os.path.basename(excel_path)}' dosyasi su anda Microsoft Excel veya baska bir programda ACIK!")
+            print(f"        Windows dosya acikken uzerine yazilmasina izin vermiyor.")
+            input("        Lutfen Excel'i KAPATIP Enter tusuna basin (tekrar denenecek)... ")
+        except Exception as e:
+            print(f"[HATA] Excel kaydedilirken hata olustu: {e}")
+            raise

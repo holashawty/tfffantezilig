@@ -1,20 +1,11 @@
 """
 run_gameweek.py
 ----------------
-Haftalik calistirilacak ana script.
-
-Kullanim:
-    python run_gameweek.py <excel_yolu> [--gameweek N] [--out cikti.xlsx]
-
-Akis:
-    1. Players / GameweekLog sheet'lerini oku
-    2. Fiyatlari guncelle (GameweekLog'da o haftaya ait fiyat varsa)
-    3. xP hesapla (price-prior + shrinkage + play_probability)
-    4. MILP ile kesin en iyi 15 / ilk 11 / kaptan / yedek sirasi
-    5. Sonucu ekrana yaz + xlsx olarak disari ver (biçimli)
+Haftalik calistirilacak ana optimizasyon ve kadro uretim script'i.
 """
 
 import argparse
+import os
 import sys
 import pandas as pd
 import openpyxl
@@ -25,31 +16,20 @@ from data_loader import load_players, load_gameweek_log
 from xp_model import compute_xp
 from optimizer import optimize_squad
 
-
-# === Excel biçimlendirme sabitleri ===
-HEADER_FILL = PatternFill(start_color="404040", end_color="404040", fill_type="solid")
-HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
-HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-CAPTAIN_FILL = PatternFill(start_color="FFEB3B", end_color="FFEB3B", fill_type="solid")  # sari
-VICE_FILL    = PatternFill(start_color="FFF59D", end_color="FFF59D", fill_type="solid")  # acik sari
-BENCH_FILL   = PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid")  # gri
-
-THIN_BORDER = Border(
-    left=Side(style="thin", color="CCCCCC"),
-    right=Side(style="thin", color="CCCCCC"),
-    top=Side(style="thin", color="CCCCCC"),
-    bottom=Side(style="thin", color="CCCCCC"),
+HEADER_FILL = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+HEADER_FONT = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+CAPTAIN_FILL = PatternFill(start_color="FEF08A", end_color="FEF08A", fill_type="solid")
+VICE_FILL    = PatternFill(start_color="FEF9C3", end_color="FEF9C3", fill_type="solid")
+BENCH_FILL   = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+THIN_BORDER  = Border(
+    left=Side(style="thin", color="CBD5E1"),
+    right=Side(style="thin", color="CBD5E1"),
+    top=Side(style="thin", color="CBD5E1"),
+    bottom=Side(style="thin", color="CBD5E1")
 )
 
-# Pozisyon siralama onceligi (GK -> DEF -> MID -> FWD)
 POS_ORDER = {"GK": 1, "DEF": 2, "MID": 3, "FWD": 4}
-# Rol onceligi (CAPTAIN ve VICE once, sonra STARTER, en son BENCH)
 ROLE_ORDER = {"CAPTAIN": 1, "VICE_CAPTAIN": 2, "STARTER": 3, "BENCH": 4}
-
-PRICE_FORMAT = '#,##0" TL"'
-XP_FORMAT = "0.00"
-PROB_FORMAT = "0%"
 
 
 def format_tl(x: float) -> str:
@@ -57,45 +37,33 @@ def format_tl(x: float) -> str:
 
 
 def print_result(result, gameweek: int):
-    print(f"\n{'='*60}")
-    print(f"  HAFTA {gameweek} - ONERILEN KADRO")
-    print(f"{'='*60}")
-    print(f"Toplam maliyet: {format_tl(result.total_budget_used)} / 100.000.000 TL")
-    print(f"Ilk 11 toplam xP: {result.total_starting_xp:.2f}")
+    print(f"\n{'='*65}")
+    print(f"  HAFTA {gameweek} - EN IYI KADRO (Taktik Dizilis: {result.formation})")
+    print(f"{'='*65}")
+    print(f"Toplam Butce Kullanimi: {format_tl(result.total_budget_used)} / 100.000.000 TL")
+    print(f"Ilk 11 Toplam xP: {result.total_starting_xp:.2f} Puan (+ Kaptan: {result.captain['xp']:.2f})")
 
     print("\n--- ILK 11 ---")
-    cols = ["name", "position_code", "team", "price_tl", "xp"]
     for pos in ["GK", "DEF", "MID", "FWD"]:
         rows = result.starters[result.starters["position_code"] == pos]
         for _, r in rows.sort_values("xp", ascending=False).iterrows():
             tag = ""
             if r["player_id"] == result.captain["player_id"]:
-                tag = "  <- KAPTAN (2x)"
+                tag = "  <- ★ KAPTAN (2x)"
             elif r["player_id"] == result.vice_captain["player_id"]:
                 tag = "  <- YEDEK KAPTAN"
-            print(f"  [{pos}] {r['name']:<28} {r['team']:<16} "
-                  f"{format_tl(r['price_tl']):>14}  xP={r['xp']:.2f}{tag}")
+            opp_str = f"(vs {r.get('fdr_opp', '')})" if r.get('fdr_opp') else ""
+            print(f"  [{pos}] {r['name']:<28} {r['team']:<18} "
+                  f"{format_tl(r['price_tl']):>14}  xP={r['xp']:.2f} {opp_str:<18}{tag}")
 
     print("\n--- YEDEKLER (oncelik sirasina gore) ---")
     if result.bench_gk is not None:
-        print(f"  [GK]  {result.bench_gk['name']:<28} xP={result.bench_gk['xp']:.2f}")
+        print(f"  [GK]  {result.bench_gk['name']:<28} {result.bench_gk['team']:<18} {format_tl(result.bench_gk['price_tl']):>14}  xP={result.bench_gk['xp']:.2f}")
     for i, (_, r) in enumerate(result.bench_outfield.iterrows(), start=1):
-        print(f"  [{i}]   {r['name']:<28} ({r['position_code']}) xP={r['xp']:.2f}")
+        print(f"  [{i}]   {r['name']:<28} ({r['position_code']}) {r['team']:<14} {format_tl(r['price_tl']):>14}  xP={r['xp']:.2f}")
 
 
 def export_result(result, path: str, gameweek: int):
-    """Kadro onerisini biçimli Excel olarak disari verir.
-
-    Biçimlendirme:
-      - Baslik satiri: kalin, gri arka plan, beyaz yazi
-      - price_tl: #,##0" TL" formati (9.000.000 TL)
-      - xp: 2 ondalik (3.84)
-      - play_probability: yuzde (95%)
-      - role=CAPTAIN satiri: sari arka plan
-      - role=VICE_CAPTAIN: acik sari
-      - role=BENCH: gri arka plan
-      - Satirlar pozisyona (GK->DEF->MID->FWD) ve role (CAPTAIN->VICE->STARTER->BENCH) gore sirali
-    """
     squad = result.squad.copy()
     squad["gameweek"] = gameweek
     squad["role"] = squad["is_starter"].map({True: "STARTER", False: "BENCH"})
@@ -104,105 +72,92 @@ def export_result(result, path: str, gameweek: int):
 
     out_cols = ["player_id", "name", "position_code", "team", "price_tl",
                 "play_probability", "xp", "role"]
+    if "fdr_opp" in squad.columns:
+        out_cols.append("fdr_opp")
+
     squad_out = squad[out_cols].copy()
 
-    # Siralama: once pozisyon (GK->DEF->MID->FWD), sonra role (CAPTAIN->VICE->STARTER->BENCH),
-    # sonra xp'ye gore azalan (ayni pozisyon+role icinde yüksek xP basta)
     squad_out["_pos_order"] = squad_out["position_code"].map(POS_ORDER)
     squad_out["_role_order"] = squad_out["role"].map(ROLE_ORDER)
     squad_out = squad_out.sort_values(
         ["_pos_order", "_role_order", "xp"], ascending=[True, True, False]
     ).drop(columns=["_pos_order", "_role_order"]).reset_index(drop=True)
 
-    # openpyxl workbook olustur, biçimlendirme uygula
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"GW{gameweek}_Kadro"
 
-    # Baslik satiri
-    headers_tr = ["Oyuncu ID", "Ad", "Pozisyon", "Takim", "Fiyat",
-                  "Oynama %", "xP", "Rol"]
-    for c, h in enumerate(headers_tr, start=1):
-        cell = ws.cell(row=1, column=c, value=h)
+    ws.append([f"TFF FANTEZİ LİGİ - HAFTA {gameweek} KADRO ÖNERİSİ (Diziliş: {result.formation})"])
+    ws.append([f"Toplam Maliyet: {format_tl(result.total_budget_used)} | İlk 11 xP: {result.total_starting_xp:.2f}"])
+    ws.append([])
+
+    headers = ["Oyuncu ID", "Ad", "Pozisyon", "Takım", "Fiyat", "Oynama %", "xP", "Rol"]
+    if "fdr_opp" in out_cols:
+        headers.append("Haftanın Rakibi")
+    ws.append(headers)
+
+    for _, r in squad_out.iterrows():
+        row_vals = [
+            r["player_id"], r["name"], r["position_code"], r["team"],
+            r["price_tl"], r["play_probability"], r["xp"], r["role"]
+        ]
+        if "fdr_opp" in out_cols:
+            row_vals.append(r.get("fdr_opp", ""))
+        ws.append(row_vals)
+
+    for cell in ws[4]:
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
-        cell.alignment = HEADER_ALIGN
-        cell.border = THIN_BORDER
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Veri satirlari
-    for r_idx, row in squad_out.iterrows():
-        r = r_idx + 2  # baslik satirindan sonra
-        values = [row["player_id"], row["name"], row["position_code"],
-                  row["team"], row["price_tl"], row["play_probability"],
-                  row["xp"], row["role"]]
-        for c, v in enumerate(values, start=1):
-            cell = ws.cell(row=r, column=c, value=v)
+    for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        role_val = row[7].value
+        fill_to_apply = None
+        if role_val == "CAPTAIN":
+            fill_to_apply = CAPTAIN_FILL
+        elif role_val == "VICE_CAPTAIN":
+            fill_to_apply = VICE_FILL
+        elif role_val == "BENCH":
+            fill_to_apply = BENCH_FILL
+
+        for cell in row:
             cell.border = THIN_BORDER
-            cell.alignment = Alignment(vertical="center")
+            if fill_to_apply:
+                cell.fill = fill_to_apply
 
-        # Hucre bicimlendirme: sayi formatlari
-        ws.cell(row=r, column=5).number_format = PRICE_FORMAT   # Fiyat
-        ws.cell(row=r, column=6).number_format = PROB_FORMAT    # Oynama %
-        ws.cell(row=r, column=7).number_format = XP_FORMAT      # xP
-
-        # Rol bazli arka plan rengi
-        role = row["role"]
-        if role == "CAPTAIN":
-            row_fill = CAPTAIN_FILL
-        elif role == "VICE_CAPTAIN":
-            row_fill = VICE_FILL
-        elif role == "BENCH":
-            row_fill = BENCH_FILL
-        else:
-            row_fill = None
-        if row_fill is not None:
-            for c in range(1, len(values) + 1):
-                ws.cell(row=r, column=c).fill = row_fill
-
-        # Kaptan/vice satirinda "Ad" kalin
-        if role in ("CAPTAIN", "VICE_CAPTAIN"):
-            ws.cell(row=r, column=2).font = Font(bold=True)
-
-    # Kolon genislikleri
-    col_widths = {
-        1: 12,  # Oyuncu ID
-        2: 30,  # Ad
-        3: 10,  # Pozisyon
-        4: 18,  # Takim
-        5: 16,  # Fiyat
-        6: 12,  # Oynama %
-        7: 10,  # xP
-        8: 14,  # Rol
-    }
-    for c, w in col_widths.items():
-        ws.column_dimensions[get_column_letter(c)].width = w
-
-    # Baslik satiri yuksekligi
-    ws.row_dimensions[1].height = 32
-
-    # Freeze panes - baslik sabit kalsin
-    ws.freeze_panes = "A2"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val = str(cell.value or "")
+            if len(val) > max_len and cell.row > 2:
+                max_len = len(val)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
     wb.save(path)
     print(f"\nSonuc yazildi: {path}")
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("excel_path")
-    ap.add_argument("--gameweek", type=int, default=1)
-    ap.add_argument("--out", default=None)
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description="Haftalik TFF Fantezi Lig kadro optimizasyonu")
+    parser.add_argument("excel_path", help="Excel veritabani dosya yolu")
+    parser.add_argument("--gameweek", type=int, default=2, help="Hafta numarasi")
+    parser.add_argument("--out", default=None, help="Cikti Excel dosyasi yolu")
+    args = parser.parse_args()
+
+    out_path = args.out or f"gw{args.gameweek}_kadro_onerisi.xlsx"
+
+    fixtures_json = f"nostradamus_predict_gw{args.gameweek}.json"
+    if not os.path.exists(fixtures_json):
+        fixtures_json = f"nostradamus_fixtures_gw{args.gameweek}.json"
 
     players = load_players(args.excel_path)
     log = load_gameweek_log(args.excel_path)
 
-    players = compute_xp(players, log)
-    result = optimize_squad(players)
+    df_xp = compute_xp(players, log, fixtures_path=fixtures_json)
+    result = optimize_squad(df_xp)
 
     print_result(result, args.gameweek)
-
-    out_path = args.out or f"gw{args.gameweek}_kadro_onerisi.xlsx"
     export_result(result, out_path, args.gameweek)
 
 

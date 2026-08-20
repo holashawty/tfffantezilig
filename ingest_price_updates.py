@@ -30,7 +30,7 @@ from difflib import SequenceMatcher
 import openpyxl
 
 from validator import validate_price_updates
-from backup_utils import backup_excel
+from backup_utils import backup_excel, safe_save_excel
 
 NAME_MATCH_THRESHOLD = 0.82
 
@@ -87,14 +87,32 @@ def load_rows(ws, header_row, headers):
 
 def match_price(update, rows):
     best_row, best_score = None, 0.0
+    u_name = update["player_name"].lower().strip()
+    u_words = set(u_name.split())
+    u_team = (update.get("team") or "").lower().strip()
+
     for row_idx, info in rows.items():
-        score = _similarity(update["player_name"], info["name"])
-        if update.get("team") and info.get("team"):
-            if update["team"].lower().strip() in info["team"].lower() or \
-               info["team"].lower().strip() in update["team"].lower():
-                score += 0.05
+        db_name = info["name"].lower().strip()
+        db_words = set(db_name.split())
+        db_team = (info.get("team") or "").lower().strip()
+        
+        team_matches = False
+        if u_team and db_team:
+            if u_team in db_team or db_team in u_team:
+                team_matches = True
+
+        score = _similarity(u_name, db_name)
+        if team_matches:
+            score += 0.05
+
+        if u_words and u_words.issubset(db_words):
+            subset_score = 0.90 + (0.10 if team_matches else 0.0)
+            if subset_score > score:
+                score = subset_score
+
         if score > best_score:
             best_row, best_score = row_idx, score
+            
     return best_row, best_score
 
 
@@ -156,7 +174,7 @@ def main():
     for m in matched:
         ws.cell(row=m["row"], column=headers["price_tl_current"]).value = m["new_price"]
 
-    wb.save(args.excel_path)
+    safe_save_excel(wb, args.excel_path)
     print(f"\n[UYGULANDI] {len(matched)} fiyat guncellendi -> {args.excel_path}")
 
 

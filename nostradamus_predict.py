@@ -157,20 +157,29 @@ def predict(fixtures_data):
 
 
 def print_predictions(predictions, stats, gameweek):
-    print(f"\n{'='*60}")
+    print(f"\n{'='*65}")
     print(f"  NOSTRADAMUS TAHMINLERI — HAFTA {gameweek}")
-    print(f"{'='*60}")
+    print(f"{'='*65}")
     print(f"  Toplam maç: {stats['n_total']}  |  Tahmin üretilen: {stats['n_ok']}  |  Atlanan: {stats['n_failed']}")
     print()
 
-    print(f"  {'#':>3}  {'Maç':40} {'1':>7} {'X':>7} {'2':>7}  {'Tah':>4}  {'Güven':>7}")
-    print("  " + "-" * 78)
+    print(f"  {'#':>3}  {'Maç':36} {'1':>7} {'X':>7} {'2':>7}  {'Tah':>4}  {'Güven':>7}  {'Taktik Not'}")
+    print("  " + "-" * 88)
     for p in predictions:
-        match = f"{p['home_team']} vs {p['away_team']}"[:40]
-        print(f"  {p['match_no']:>3}  {match:40} "
-              f"{p['probabilities']['1']:>7.1%} {p['probabilities']['X']:>7.1%} "
-              f"{p['probabilities']['2']:>7.1%}  {p['prediction']:>4}  "
-              f"{p['confidence']:>7.1%}")
+        match = f"{p['home_team']} vs {p['away_team']}"[:36]
+        p1, px, p2 = p['probabilities']['1'], p['probabilities']['X'], p['probabilities']['2']
+        
+        # Taktiksel ipucu analizi
+        note = ""
+        if abs(p1 - p2) < 0.08 and px >= 0.27:
+            note = "⚡ Dengeli Maç (X düşünülebilir)"
+        elif p['confidence'] >= 0.65:
+            note = "★ Banko / Güçlü Favori"
+
+        print(f"  {p['match_no']:>3}  {match:36} "
+              f"{p1:>7.1%} {px:>7.1%} "
+              f"{p2:>7.1%}  {p['prediction']:>4}  "
+              f"{p['confidence']:>7.1%}  {note}")
 
     print()
     print("  Nostradamus kuralları (docs/01):")

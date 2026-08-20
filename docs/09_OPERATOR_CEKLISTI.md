@@ -33,7 +33,7 @@ kaydırılmalı.
 
 ### T-48 saat (Perşembe sabahı)
 1. **Web araştırması yap:** `web_arastirma_prompti.md`'yi bir web AI'ya
-   (Gemini, Claude web, ChatGPT) yapıştır. Çıkan JSON'u
+   (Gemini, ChatGPT veya web araması yapabilen bir AI) yapıştır. Çıkan JSON'u
    `web_research_gwN.json` olarak kaydet.
 2. **Dry-run:** `menu.bat` → [4] → [4a] → dosya yolu gir → raporu oku.
    - İsim eşleşmeyenler listesini kontrol et — yanlış JSON girişi varsa düzelt.

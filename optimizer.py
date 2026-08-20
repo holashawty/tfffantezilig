@@ -1,31 +1,16 @@
 """
 optimizer.py
 ------------
-Kesin (deterministik) kadro secimi: MILP (Mixed Integer Linear
-Programming), scipy.optimize.milp (HiGHS solver) ile.
+Kesin (deterministik) kadro secimi: MILP (Mixed Integer Linear Programming),
+scipy.optimize.milp (HiGHS solver) ile.
 
-Neden LLM/prompt degil: bu problem "443 oyuncu icinden butce,
-mevki ve kulup kisitlarini KESIN saglayan xP-maksimize eden 15
-kisiyi bul" seklinde klasik bir tam sayili optimizasyon problemi.
-MILP saniyeler icinde matematiksel garantili en iyi cozumu bulur;
-bir LLM'e tabloyu okutup sectirmek ne kisitlari garanti eder ne de
-tekrarlanabilir sonuc verir.
-
-Karar degiskenleri:
-  x_i in {0,1}  -> oyuncu i, 15 kisilik kadroda mi?
-  s_i in {0,1}  -> oyuncu i, ilk 11'de mi?
-
-Kisitlar (resmi kurallar, tfffantezilig.com/yardim):
-  - s_i <= x_i                          (ilk 11, kadronun alt kumesi)
-  - sum(x) == 15                        (kadro boyutu)
-  - sum(s) == 11                        (ilk 11 boyutu)
-  - sum(price_i * x_i) <= 100.000.000   (butce)
-  - pozisyon bazli kadro sayilari: 2 GK, 5 DEF, 5 MID, 3 FWD
-  - ilk 11 icinde: GK == 1, DEF >= 3, FWD >= 1
-  - takim basi kadroda en fazla 3 oyuncu
+Yedek Kadro Deger Agirligi (Bench Weighting):
+  Obj = sum(s_i * xp_i) + BENCH_WEIGHT * sum((x_i - s_i) * xp_i)
+Bu sayede bakiye butce (orn: 10M TL) bos 0-xp oyunculara harcanmaz;
+sahaya cikip puan alma potansiyeli en yuksek canli yedekler alinir.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from scipy.optimize import milp, LinearConstraint, Bounds
@@ -35,36 +20,37 @@ from data_loader import (
     SQUAD_SIZE, STARTING_SIZE, GOAL_POINTS,
 )
 
-CAPTAIN_CEILING_WEIGHT = 0.5  # kaptan secerken tavan(gol olasiligi) agirligi
+CAPTAIN_CEILING_WEIGHT = 0.5
+BENCH_XP_WEIGHT = 0.15  # Yedeklerin toplam kadro degerine katkisi (butceyi verimli kullanir)
 
 
 @dataclass
 class SquadResult:
-    squad: pd.DataFrame          # 15 oyuncu
-    starters: pd.DataFrame       # 11 oyuncu (xp'ye gore siralanmis degil, mevkiye gore)
+    squad: pd.DataFrame
+    starters: pd.DataFrame
     bench_gk: pd.Series
-    bench_outfield: pd.DataFrame  # 3 oyuncu, oynama onceligine gore siralanmis (1,2,3)
+    bench_outfield: pd.DataFrame
     captain: pd.Series
     vice_captain: pd.Series
     total_budget_used: float
     total_starting_xp: float
+    formation: str
 
 
-def _build_and_solve(players: pd.DataFrame) -> pd.DataFrame:
+def _build_and_solve(players: pd.DataFrame, bench_weight: float = BENCH_XP_WEIGHT) -> pd.DataFrame:
     n = len(players)
     pos = players["position_code"].values
     price = players["price_tl"].values.astype(float)
     xp = players["xp"].values.astype(float)
     teams = players["team"].values
 
-    # Degisken vektoru: [x_0..x_{n-1}, s_0..s_{n-1}]
     n_vars = 2 * n
     c = np.zeros(n_vars)
-    c[n:] = -xp  # minimize(-xp) == maximize(xp), sadece starter'lar puan getirir
+    c[:n] = -bench_weight * xp            # 15 kisilik kadrodaki tum oyuncularin degeri
+    c[n:] = -(1.0 - bench_weight) * xp   # Ilk 11 oyuncusu tam 1.0 agirlik kazanir
 
     integrality = np.ones(n_vars)
     bounds = Bounds(lb=np.zeros(n_vars), ub=np.ones(n_vars))
-
     constraints = []
 
     # s_i <= x_i  ->  s_i - x_i <= 0
@@ -82,21 +68,21 @@ def _build_and_solve(players: pd.DataFrame) -> pd.DataFrame:
     A = np.zeros((1, n_vars)); A[0, n:] = 1
     constraints.append(LinearConstraint(A, STARTING_SIZE, STARTING_SIZE))
 
-    # butce
+    # butce <= 100M
     A = np.zeros((1, n_vars)); A[0, :n] = price
     constraints.append(LinearConstraint(A, 0, BUDGET_TL))
 
-    # pozisyon bazli kadro sayilari
-    for p, count in SQUAD_REQUIREMENTS.items():
+    # pozisyon bazli kadro: 2 GK, 5 DEF, 5 MID, 3 FWD
+    for p_code, count in SQUAD_REQUIREMENTS.items():
         A = np.zeros((1, n_vars))
-        idx = np.where(pos == p)[0]
+        idx = np.where(pos == p_code)[0]
         A[0, idx] = 1
         constraints.append(LinearConstraint(A, count, count))
 
-    # ilk 11 pozisyon kurallari
+    # ilk 11 kurali: GK == 1, DEF >= 3, FWD >= 1
     idx_gk = np.where(pos == "GK")[0]
     A = np.zeros((1, n_vars)); A[0, n + idx_gk] = 1
-    constraints.append(LinearConstraint(A, 1, 1))  # tam 1 kaleci sahada
+    constraints.append(LinearConstraint(A, 1, 1))
 
     idx_def = np.where(pos == "DEF")[0]
     A = np.zeros((1, n_vars)); A[0, n + idx_def] = 1
@@ -117,20 +103,17 @@ def _build_and_solve(players: pd.DataFrame) -> pd.DataFrame:
     if not res.success:
         raise RuntimeError(f"MILP cozulemedi: {res.message}")
 
-    x = res.x[:n] > 0.5
-    s = res.x[n:] > 0.5
-
     out = players.copy()
-    out["in_squad"] = x
-    out["is_starter"] = s
+    out["in_squad"] = res.x[:n] > 0.5
+    out["is_starter"] = res.x[n:] > 0.5
     return out
 
 
-def optimize_squad(players: pd.DataFrame) -> SquadResult:
+def optimize_squad(players: pd.DataFrame, bench_weight: float = BENCH_XP_WEIGHT) -> SquadResult:
     if players["xp"].isnull().any():
         raise ValueError("xp kolonu bos olan oyuncu(lar) var — once compute_xp calistir.")
 
-    solved = _build_and_solve(players)
+    solved = _build_and_solve(players, bench_weight=bench_weight)
     squad = solved[solved["in_squad"]].copy()
     starters = squad[squad["is_starter"]].copy()
     bench = squad[~squad["is_starter"]].copy()
@@ -143,10 +126,17 @@ def optimize_squad(players: pd.DataFrame) -> SquadResult:
         .reset_index(drop=True)
     )
 
-    # Kaptan: xP + tavan(gol olasiligi * gol puani) agirlikli skor
+    # Taktik dizilis tespiti (Orn: 3-5-2, 4-3-3, 3-4-3)
+    n_def = (starters["position_code"] == "DEF").sum()
+    n_mid = (starters["position_code"] == "MID").sum()
+    n_fwd = (starters["position_code"] == "FWD").sum()
+    formation = f"{n_def}-{n_mid}-{n_fwd}"
+
+    # Kaptan: xP + tavan skoru
     starters = starters.copy()
+    goal_component = starters["goal_prob_component"] if "goal_prob_component" in starters.columns else 0.0
     starters["captain_score"] = starters["xp"] + CAPTAIN_CEILING_WEIGHT * (
-        starters["goal_prob_component"] * starters["position_code"].map(GOAL_POINTS)
+        goal_component * starters["position_code"].map(GOAL_POINTS)
     )
     starters_sorted = starters.sort_values("captain_score", ascending=False)
     captain = starters_sorted.iloc[0]
@@ -159,6 +149,7 @@ def optimize_squad(players: pd.DataFrame) -> SquadResult:
         bench_outfield=bench_outfield,
         captain=captain,
         vice_captain=vice_captain,
-        total_budget_used=squad["price_tl"].sum(),
-        total_starting_xp=starters["xp"].sum(),
+        total_budget_used=float(squad["price_tl"].sum()),
+        total_starting_xp=float(starters["xp"].sum()),
+        formation=formation
     )

@@ -6,7 +6,7 @@ madde EKLESİN, öncekileri SİLMESİN.
 
 ---
 
-## 12 Ağustos 2026 — Kurulum oturumu (Claude ile)
+## 12 Ağustos 2026 — Kurulum ve Sistem Mimarisi Oturumu
 **Yapıldı:**
 - Excel şeması Players/GameweekLog/Fixtures olarak yeniden kuruldu
   (orijinal 444 satırlık hatalı "GENEL TOPLAM" satırı temizlendi → 443 gerçek oyuncu)

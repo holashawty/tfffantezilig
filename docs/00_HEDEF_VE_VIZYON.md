@@ -16,7 +16,7 @@ sen (agent) değil, önceki analiz sürecinde biz vardık. Uygula:
 - **Kadroyu MİLP seçer. Kaptanı MİLP seçer. 9 maçın 1-X-2 tahminini
   devig+Poisson modeli seçer.** Bunlar kesin, deterministik, kod
   çıktısıdır.
-- **AI (Gemini/Claude/web sohbeti) bu çıktıyı ONAYLAMAZ, VETO ETMEZ,
+- **Harici AI asistanı (Gemini/ChatGPT) bu çıktıyı ONAYLAMAZ, VETO ETMEZ,
   DEĞİŞTİRMEZ.** AI'nin üç meşru görevi var:
   1. Web araştırması (sakatlık/ceza/fiyat) — sınırlı, JSON formatında,
      her zaman `validator.py` + dry-run/`--apply` deseninden geçer.
